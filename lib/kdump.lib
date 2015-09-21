@@ -1,0 +1,144 @@
+# vim: ts=4 ft=sh
+
+#####################################################################
+# Private library stubs
+
+function _lib_load {
+	[[ -z "${1:-}" ]] && {
+		logerror "${FUNCNAME[0]} called without argument"
+		return 1
+	}
+	declare libfile="${BASH_SOURCE[0]}"
+	libfile="${libfile%/*}/$1.lib"
+	[[ ! -e "$libfile" ]] && {
+		logerror "Library file $libfile does not exists"
+		return 1
+	}
+	source "$libfile"
+}
+
+function _lib_replaceme {
+	echo "The function ${FUNCNAME[1]} (file ${BASH_SOURCE[1]}) must be replaced"
+	echo "This is a code error. Script will now terminate"
+	exit 100
+}
+
+
+#####################################################################
+# Logging
+
+declare _COL_ESC="\e["
+declare _COL_RST="${_COL_ESC}0m"
+declare _COL_RED="${_COL_ESC}31m"
+declare _COL_YEL="${_COL_ESC}33m"
+
+declare LOG_BUFFER=""
+declare LOG_ERRBUFFER=""
+declare LOG_LEVEL=1
+function _logdisp {
+	declare color=""
+	declare header=""
+	declare type="$1"; shift
+
+	case $type in
+		info) color="$_COL_RST" ;;
+		warn) color="$_COL_YEL" ;;
+		erro) color="$_COL_RED" ;;
+		*)    ;;
+	esac
+
+	echo -e "$color[$type] $@${_COL_RST}"
+}
+
+function loginfo {
+	_logdisp 'info' "$@"
+}
+
+function logerror {
+	_logdisp 'erro' "$@" >&2
+
+}
+
+function logwarning {
+	_logdisp 'warn' "$@" >&2
+}
+
+
+#####################################################################
+# User interaction
+
+function ask_yn {
+	declare ask="$@"
+	declare rep=""
+	while [[ ! $rep =~ "^[yYnN][eEsSoO]{0,2}$" ]]; do
+		read -p "$ask" rep
+	done
+	[[ $ret =~ "^[yY][eEsS]{0,2}" ]]
+}
+
+function user_requireaccess {
+	declare axx="$1"
+	declare file="$2"
+	declare ret=0
+	case $axx in
+		readwrite|rw)	[[ -r "$file" ]] && [[ -w "$file" ]]; ret=$?	;;
+		read|r)			[[ -r "$file" ]];	ret=$?	;;
+		write|w)		[[ -w "$file" ]];	ret=$?	;;
+		exec|x)			[[ -x "$file" ]];	ret=$?	;;
+		*)								ret=254	;;
+	esac
+
+	return $ret
+}
+
+function normalize_unit {
+	declare -l value="$1"
+	declare -i coeff=0
+	# Remove last b if present
+	value="${value%b}"
+
+	# test units in order
+	declare -i id=0
+	for u in k m g t p e z y; do
+		[[ "${value%$u}" != "${value}" ]] && {
+			value="${value%$u}"
+			coeff=$id
+			break
+		}
+		id=id+1
+	done
+
+	echo $(( $value * 1024**$coeff))
+}
+
+
+#####################################################################
+# Try to find a binary
+
+function bin_find {
+	declare bin="$1"
+	declare oifs="$IFS"
+	IFS=:
+	for p in $PATH; do
+		[[ -e "$p/$bin" ]] && {
+			IFS="$oifs"
+			echo "$p/$bin"
+			return 0
+		}
+	done
+	IFS="$oifs"
+	return 1
+}
+
+function bin_require {
+	declare bins="$@"
+	declare missing=""
+	for b in $bins; do
+		bin_find "$b" || {
+			missing="$missing $b"
+			echo -n "$b "
+		}
+	done
+	[[ -z "$missing" ]]
+}
+

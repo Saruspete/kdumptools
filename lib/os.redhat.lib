@@ -1,0 +1,30 @@
+
+function os_pkginstall {
+	yum -y install "$@"
+}
+
+function os_pkgremove {
+	yum -y remove "$@"
+}
+
+
+function os_kern2release {
+	declare kern_vers="$1"
+	declare release=""
+
+	case $kern_vers in
+		2.6.18-*)	release="5" ;;
+		2.6.32-*)	release="6" ;;
+		3.10.0-*)	release="7" ;;
+		*) : ;;
+	esac
+
+	echo $release
+}
+
+function os_getdbginfo {
+	declare kern_vers="$1"
+	declare kern_arch="$2"
+
+
+}

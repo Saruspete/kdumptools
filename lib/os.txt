@@ -1,0 +1,20 @@
+
+
+######### Redhat ##########
+Bootcnf: /etc/sysconfig/grub
+Bootupd: 
+Package: kexec-tools
+Service: kdump
+Dgbinfo: 
+
+
+######### Debian ##########
+
+Package: kdump-tools + kexec-tools
+Service:
+Dbginfo: 
+
+
+######### Gentoo ##########
+Packages: kexec-tools
+

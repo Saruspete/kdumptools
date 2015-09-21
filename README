@@ -1,0 +1,16 @@
+# Author: Adrien Mahieux <adrien.mahieux@gmail.com>
+
+# Why bash ?
+Shell is the most low-level language for sysadmins.
+And bash because it's the default shell for most Linux distributions
+
+Perl ? I love it, but most people don't
+Awk ? Even fewer people know how to use it
+
+Other script langage ? We're doing sysadmin here. Not a website
+
+
+# What tools are required
+bash, getopt, grep, id, uname, 
+
+I didn't used awk cause on some ultra-light systems, it's not installed

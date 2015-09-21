@@ -1,0 +1,17 @@
+# vim: ts=4 ft=sh
+
+# Define some subs to be defined
+function os_pkgextract  { _lib_replaceme; }
+function os_pkginstall  { _lib_replaceme; }
+function os_pkgremove   { _lib_replaceme; }
+function os_pkgprovides { _lib_replaceme; }
+function os_bininstall  { :; }
+
+function os_kern2release { _lib_replaceme; }
+function os_getdbginfo  { _lib_replaceme; }
+
+# Load the OS related subs
+[[ -e "/etc/redhat-release" ]] && _lib_load "os.redhat"
+[[ -e "/etc/debian_version" ]] && _lib_load "os.debian"
+[[ -e "/etc/gentoo-release" ]] && _lib_load "os.gentoo"
+
