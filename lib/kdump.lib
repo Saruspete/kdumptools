@@ -70,13 +70,28 @@ function logwarning {
 function ask_yn {
 	declare ask="$@"
 	declare rep=""
-	while [[ ! $rep =~ "^[yYnN][eEsSoO]{0,2}$" ]]; do
-		read -p "$ask" rep
+	while [[ ! $rep =~ ^[yYnN][eEsSoO]{0,2}$ ]]; do
+		read -p "$ask [y/n] ? " rep
 	done
-	[[ $ret =~ "^[yY][eEsS]{0,2}" ]]
+	[[ $rep =~ ^[yY][eEsS]{0,2} ]]
 }
 
-function user_requireaccess {
+
+#####################################################################
+# File management
+
+function file_gettemp {
+	declare prefix="${1:-/tmp}"
+	declare filepref="${BASH_SOURCE[0]}"
+
+	declare file="$prefix/${filepref%.*}.$$.$RANDOM"
+	while [[ -e "$file" ]]; do 
+		file="$prefix/${filepref%.*}.$$.$RANDOM"
+	done
+	echo $file
+}
+
+function file_requireaccess {
 	declare axx="$1"
 	declare file="$2"
 	declare ret=0
@@ -90,6 +105,31 @@ function user_requireaccess {
 
 	return $ret
 }
+
+function file_fetch {
+	declare src="${1:-}"
+	declare dst="${2:-$(file_gettemp)}"
+
+	declare ret=1
+
+	# Curl
+	bin_find curl >/dev/null && {
+		curl --create-dirs -o "$dst" "$src" 2>/dev/null
+		ret=$?
+	}
+
+	# wget
+	bin_find wget >/dev/null && {
+		wget -O "$dst" "$src" 2>/dev/null
+		ret=$?
+	}
+
+	[[ -s "$dst" ]] && echo "$dst"
+	return $ret
+}
+
+#####################################################################
+# Strings manipulation
 
 function normalize_unit {
 	declare -l value="$1"
