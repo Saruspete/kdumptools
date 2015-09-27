@@ -1,10 +1,43 @@
+PKG_CRASH="crash"
+PKG_KDUMP="kexec-tools"
+PKG_KEXEC="kexec-tools"
 
-function os_pkginstall {
-	yum -y install "$@"
+
+function os_pkginstall  { yum -y install "$@" ; }
+function os_pkgremove   { yum -y remove "$@" ; }
+function os_pkgprovides {
+	for file in "$@"; do
+		# Add a slash if its only a filename
+		[[ "${file//\//}" == "$file" ]] && file="/$file"
+
+		# Using yum
+		yum -q provides "*$file" 2>/dev/null \
+		| grep -oP '^[^\s]+' \
+		| grep -vP '^(Repo|Filename|Matched|Other)'
+	done
 }
 
-function os_pkgremove {
-	yum -y remove "$@"
+function os_pkgextract {
+	declare pkg="${1:-}"
+	declare dst="${2:-$(file_gettemp)}"
+
+	# Extraction folder
+	declare xtd="$dst/extract"
+	[[ -e "$xtd" ]] || mkdir -p "$xtd"
+
+	# Select correct operation for current package status
+	declare op="install"
+	rpm -q "$pkg" >/dev/null 2>&1 && op="reinstall"
+
+	yum -y "$op" --downloadonly --downloaddir="$dst" "$pkg"
+	# Spawn subshell for path changing
+	(
+		cd $xtd
+		for rpm in "$dst/*.rpm"; do
+			rpm2cpio "$rpm" | cpio -idm
+		done
+	)
+	echo "$xtd"
 }
 
 
@@ -26,5 +59,15 @@ function os_getdbginfo {
 	declare kern_vers="$1"
 	declare kern_arch="$2"
 
-
+	case $os_flavour in
+		fedora)
+			;;
+		centos)
+	# http://debuginfo.centos.org/7/x86_64/
+			
+			;;
+		rhel)
+			#https://rhn.redhat.com/rhn/software/packages/details/Overview.do
+			;;
+	esac
 }

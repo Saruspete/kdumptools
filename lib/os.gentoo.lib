@@ -1,0 +1,14 @@
+PKG_CRASH="dev-utils/crash"
+PKG_KEXEC="sys-apps/kexec-tools"
+PKG_KDUMP=""
+
+function os_pkginstall   { emerge "$@" ; }
+function os_pkgremove    { emerge -C "$@" ; }
+function os_pkgprovides  {
+	declare file="${1:-}"
+	# TODO: implement it
+	declare url="http://www.portagefilelist.de/index.php/Special:PFLQuery2?file=$file&searchfile=lookup&lookup=file&txt"
+
+	return 1
+}
+
