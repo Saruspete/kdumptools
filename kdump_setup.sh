@@ -49,11 +49,9 @@ while [[ -n "${1:-}" ]]; do
 			shift 2
 			;;
 		# Special cases for getopt
-		--)	shift; break ;;
-		*)
-			logerror "Unknown option: '$1'"
-			shift
-			;;
+		--)				shift; break ;;
+		-?*)			logerror "Unknown option: '$1'"; shift ;;
+		*)				break ;;
 	esac
 done
 
@@ -86,11 +84,25 @@ else
 	done
 fi
 
-[[ -z "$KRN_CONFIG" ]] && {
+# Check the required config parameters
+if [[ -n "$KRN_CONFIG" ]]; then
+	for opt in KEXEC SYSFS DEBUG_INFO CRASH_DUMP PROC_VMCORE RELOCATABLE; do
+		echo "$KRN_CONFIG" | grep "^CONFIG_$opt=y" >/dev/null || {
+			logerror "Required kernel config 'CONFIG_$opt' is not enabled"
+		}
+	done
+
+else
 	logerror "Cannot find valid kernel config file"
 	logerror "You can use the -k option to specify it manually"
 	RET_CODE=10
-}
+fi
+
+
+#
+# Step 2 - bootloader configuration
+#
+
 
 # kernel boot argument
 declare crashoption="$(echo "$KRN_CMDRUN" | grep -Po 'crashkernel=[^\s]+')"
@@ -136,6 +148,7 @@ if [[ -n "$crashoption" ]]; then
 
 		# Check value
 		if [[ -n "$crashselect" ]]; then
+			# TODO: Add value validation
 			loginfo "Using reservation: $crashselect"
 		else
 			logerror "Cannot find the value in '$crashstring'"
@@ -149,20 +162,25 @@ else
 fi
 
 
-#
-# Step 2 - bootloader configuration
-# 
 
 
 #
 # Step 3 -kdump installation
 #
-
+[[ -n "$(bin_find "kexec")" ]] || {
+	[[ -n "$PKG_KEXEC" ]] && {
+		log_info "We need to install kexec tools (package: $PKG_KEXEC)"
+	}
+}
 
 
 #
 # Step 4 - kdump configuration
 #
+[[ -n "$PKG_KDUMP" ]] && {
+	os_pkginstall "$PKG_KDUMP"
+}
+
 
 #
 # Step 5 - kdump initrd image generation
