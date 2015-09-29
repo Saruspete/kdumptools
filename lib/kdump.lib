@@ -174,7 +174,7 @@ function bin_require {
 	declare bins="$@"
 	declare missing=""
 	for b in $bins; do
-		bin_find "$b" || {
+		bin_find "$b" >/dev/null || {
 			missing="$missing $b"
 			echo -n "$b "
 		}
