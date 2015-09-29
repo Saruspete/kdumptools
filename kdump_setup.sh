@@ -14,7 +14,7 @@ declare MYPATH="${MYSELF%/*}"
 source "$MYPATH/lib/kdump.lib"
 source "$MYPATH/lib/os.lib"
 
-declare RET_CODE=0
+declare -i RET_CODE=0
 
 declare OPT_FIX=0
 declare OPT_HELP=0
@@ -32,6 +32,11 @@ declare MEM_AVAILABLE="$(grep -Po '^MemTotal:\s+[0-9]+' /proc/meminfo|grep -Po '
 function show_help {
 	echo "Usage: $0 [options]"
 	echo
+	echo "Options:"
+	echo "  -f|--fix       Fix errors when possible"
+	echo "  -q|--quiet     Do not output error"
+	echo "  -h|--help      Display this help"
+	echo "  -k|--kconf     Path to the kernel .config file"
 }
 
 
@@ -72,9 +77,19 @@ done
 # Step 1 - Kernel configuration
 #
 
+if [[ -n "$KRN_CONFIGFILE" ]]; then
+	if [[ -e "$KRN_CONFIGFILE" ]]; then
+		loginfo "Using user-specified kernel config file '$KRN_CONFIGFILE'"
+		KRN_CONFIG="$(<$KRN_CONFIGFILE)"
+	else
+		logerror "Bad user-specified kernel config file: '$KRN_CONFIGFILE'"
+	fi
+
 # Most accurate kernel config
-if [[ -e "/proc/config.gz" ]]; then
+elif [[ -e "/proc/config.gz" ]]; then
 	KRN_CONFIG="$(gunzip -c /proc/config.gz)"
+
+# Usual .config locations
 else
 	for k in /usr/src/{kernels/$KRN_VERSION,linux-$KRN_VERSION}/.config; do
 		[[ -e "$k" ]] && {
@@ -86,16 +101,23 @@ fi
 
 # Check the required config parameters
 if [[ -n "$KRN_CONFIG" ]]; then
-	for opt in KEXEC SYSFS DEBUG_INFO CRASH_DUMP PROC_VMCORE RELOCATABLE; do
+	for opt in KEXEC SYSFS CRASH_DUMP PROC_VMCORE; do
 		echo "$KRN_CONFIG" | grep "^CONFIG_$opt=y" >/dev/null || {
 			logerror "Required kernel config 'CONFIG_$opt' is not enabled"
+			RET_CODE=RET_CODE+1
+		}
+	done
+	for opt in DEBUG_INFO RELOCATABLE; do
+		echo "$KRN_CONFIG" | grep "^CONFIG_$opt=y" >/dev/null || {
+			logwarning "Recommended kernel config 'CONFIG_$opt' is not enabled"
+			RET_CODE=RET_CODE+1
 		}
 	done
 
 else
 	logerror "Cannot find valid kernel config file"
 	logerror "You can use the -k option to specify it manually"
-	RET_CODE=10
+	RET_CODE=RET_CODE+1
 fi
 
 
@@ -105,6 +127,7 @@ fi
 
 
 # kernel boot argument
+declare bootchange=""
 declare crashoption="$(echo "$KRN_CMDRUN" | grep -Po 'crashkernel=[^\s]+')"
 if [[ -n "$crashoption" ]]; then
 	declare crashstring="${crashoption%*=}"
@@ -115,8 +138,8 @@ if [[ -n "$crashoption" ]]; then
 	if [[ "$crashstring" == "auto" ]]; then
 		# Check for > 2G RAM
 		[[ "$MEM_AVAILABLE" -lt "$(normalize_unit "2G")" ]] && {
-			logerror "You have less than 2G RAM. crashkernel=auto will not work"
-			RET_CODE=12
+			logerror "You have less than 2G RAM, crashkernel=auto will not work"
+			RET_CODE=RET_CODE+1
 		}
 	else
 		# Parsing for multiple selection (512M-2G:64M,2G-:128M)
@@ -139,6 +162,7 @@ if [[ -n "$crashoption" ]]; then
 					}
 				else
 					logerror "Unable to understand tuple '$sel'. Please check "
+					RET_CODE=RET_CODE+1
 				fi
 			# Simple crashkernel= match
 			else
@@ -152,33 +176,85 @@ if [[ -n "$crashoption" ]]; then
 			loginfo "Using reservation: $crashselect"
 		else
 			logerror "Cannot find the value in '$crashstring'"
-			RET_CODE=13
+			RET_CODE=RET_CODE+1
 		fi
 	fi
 else
 	logwarning "Your system is not started with 'crashkernel=XXX' option."
 	logwarning "You'll have to reboot your system once added"
-	RET_CODE=11
+	RET_CODE=RET_CODE+1
 fi
 
+# Change bootloader conf
+if [[ -z "$crashoption" ]] || [[ -n "$bootchange" ]]; then
+	# Default param
+	# TODO: check for < 2G RAM
+	[[ -z "$bootchange" ]] && bootchange="crashkernel=auto"
 
-
+fi
 
 #
 # Step 3 -kdump installation
 #
-[[ -n "$(bin_find "kexec")" ]] || {
-	[[ -n "$PKG_KEXEC" ]] && {
-		log_info "We need to install kexec tools (package: $PKG_KEXEC)"
-	}
+
+# Kexec
+[[ -z "$(bin_find "kexec")" ]] || {
+	if [[ "$OPT_FIX" -eq 1 ]] && [[ -n "$PKG_KEXEC" ]]; then
+		loginfo "Need to install kexec tools (package: $PKG_KEXEC)"
+		if ask_yn "Proceed with installation"; then
+			os_pkginstall "$PKG_KEXEC" || {
+				logerror "Error during installation of the package"
+				RET_CODE=RET_CODE+1
+			}
+		else
+			logerror "kexec tool is required"
+			RET_CODE=RET_CODE+1
+		fi
+	else
+		logerror "Cannot find executable 'kexec' in \$PATH, and the script"
+		logerror "doesn't know the package name for your distribution"
+		RET_CODE=RET_CODE+1
+	fi
 }
 
+# kdump package
+if [[ -n "$PKG_KDUMP" ]]; then
+
+	# Is package installed
+	! os_pkginstalled "$PKG_KDUMP" && {
+		if [[ "$OPT_FIX" -eq 1 ]]; then
+			loginfo "Need to install kdump tools (package: $PKG_KDUMP)"
+			if ask_yn "Proceed with installation"; then
+				os_pkginstall "$PKG_KDUMP" || {
+					logerror "Error during installation of the package"
+					RET_CODE=RET_CODE+1
+				}
+			else
+				logerror "kdump tool is required"
+				RET_CODE=RET_CODE+1
+			fi
+		else
+			logerror "Package $PKG_KDUMP must be installed"
+			RET_CODE=RET_CODE+1
+		fi
+	}
+
+	# Service must be started
+	os_svcenabled "kdump" || {
+		loginfo "Need to enable the service"
+	}
+else
+	# TODO: Use a custom made generic kdump script
+	logwarning "The variable \$PKG_KDUMP is not set for your distribution"
+	logwarning "I cannot check if it is installed or not."
+	RET_CODE=RET_CODE+1
+fi
 
 #
 # Step 4 - kdump configuration
 #
-[[ -n "$PKG_KDUMP" ]] && {
-	os_pkginstall "$PKG_KDUMP"
+[[ -e "/etc/kdump.conf" ]] && {
+	:
 }
 
 
