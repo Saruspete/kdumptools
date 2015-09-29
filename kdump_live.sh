@@ -3,6 +3,8 @@ set -u
 declare MYSELF="$(readlink -f $0)"
 declare MYPATH="${MYSELF%/*}"
 
+
+
 #
 source "$MYPATH/lib/kdump.lib"
 
@@ -14,7 +16,7 @@ source "$MYPATH/lib/kdump.lib"
 }
 
 # Step 1 - System : Check if STRICTMEM is enabled
-dd if=/dev/mem of=/dev/null bs=1024 count=2 >/dev/null 2>&1 || {
+dd if=/dev/mem of=/dev/null bs=1024 count=2048 >/dev/null 2>&1 || {
 	loginfo "STRICTMEM restriction in effect. We'll need to workaround"
 
 	# Check if we can load our kretprobe module
@@ -27,24 +29,62 @@ dd if=/dev/mem of=/dev/null bs=1024 count=2 >/dev/null 2>&1 || {
 	declare ALLOWMEMPATH="$MYPATH/src/allow_devmem"
 
 	# Check for required tools
-	declare compiletools="make gcc000"
+	declare compiletools="make gcc"
 	declare missingtools="$(bin_require $compiletools)"
 	[[ -n "$missingtools" ]] && {
-		if ask_yn "Some require tools are missing ($missingtools). Should I try to install them ?"; then
+		if ask_yn "Some required tools are missing ($missingtools). Should I try to install them ?"; then
 			os_bininstall $missingtools || {
 				logerror "There was an error during installation of $missingtools"
 				logerror "Please check logs at : $LOGPATH and fix manually"
 				exit 10
 			}
 		else
-			logerror "Please install manually"
+			logerror "Please install these packages manually"
 		fi
 	}
+
+	# Check for module presency
+	grep '^allow_devmem ' /proc/modules >/dev/null && {
+		logerror "Module allow_devmem is loaded but I can't access /dev/mem..."
+		logerror "This is a bug, and should be reported"
+		exit 1
+	}
+	
+	# Target module
+	declare memkmod_src="$ALLOWMEMPATH/allow_devmem.ko"
+	declare memkmod_tgt="$ALLOWMEMPATH/allow_devmem-$(uname -r).ko"
+		
+	# Compile the module if needed
+	[[ -e "$memkmod_tgt" ]] || {
+		make -C $ALLOWMEMPATH
+		if [[ -e "$memkmod_src" ]]; then
+			mv "$memkmod_src" "$memkmod_tgt"
+		else
+			logerror "Error during compilation of '$memkmod_src'. Please check logs"
+			exit 11
+		fi
+	}
+
+	if [[ -e "$memkmod_tgt" ]]; then
+		declare bin_insmod="$(bin_find "insmod")"
+		if [[ -n "$bin_insmod" ]]; then
+			$bin_insmod "$memkmod_tgt" || {
+				logerror "Error during load of $memkmod_tgt. Please check logs"
+				exit 12
+			}
+		else
+			logerror "Cannot find bin 'insmod'. Required for loading modules"
+			exit 13
+		fi
+	else
+		logerror "Can't find module ($memkmod_tgt)."
+		exit 10
+	fi
 	
 }
 
 # Step 2 - Check basic tools
-bin_require crash || {
+bin_require "crash" >/dev/null || {
 	if ask_yn "I require 'crash' tool to continue. Should I try to install it ?"; then
 		os_pkginstall "crash"
 	else
