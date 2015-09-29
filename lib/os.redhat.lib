@@ -3,9 +3,10 @@ PKG_KDUMP="kexec-tools"
 PKG_KEXEC="kexec-tools"
 
 
-function os_pkginstall  { yum -y install "$@" ; }
-function os_pkgremove   { yum -y remove "$@" ; }
-function os_pkgprovides {
+function os_pkginstall   { yum -y install "$@" ; }
+function os_pkginstalled { rpm -q "$@" >/dev/null 2>&1; }
+function os_pkgremove    { yum -y remove "$@" ; }
+function os_pkgprovides  {
 	for file in "$@"; do
 		# Add a slash if its only a filename
 		[[ "${file//\//}" == "$file" ]] && file="/$file"

@@ -6,14 +6,15 @@ declare PKG_KDUMP=""
 declare PKG_KEXEC=""
 
 # Define some subs to be defined
-function os_pkgextract  { _lib_replaceme; }
-function os_pkginstall  { _lib_replaceme; }
-function os_pkgremove   { _lib_replaceme; }
-function os_pkgprovides { _lib_replaceme; }
+function os_pkgextract   { _lib_replaceme; }
+function os_pkginstall   { _lib_replaceme; }
+function os_pkginstalled { _lib_replaceme; }
+function os_pkgremove    { _lib_replaceme; }
+function os_pkgprovides  { _lib_replaceme; }
 
-function os_getflavour  { _lib_replaceme; }
+function os_getflavour   { _lib_replaceme; }
 function os_kern2release { _lib_replaceme; }
-function os_getdbginfo  { _lib_replaceme; }
+function os_getdbginfo   { _lib_replaceme; }
 
 function os_bininstall  {
 	declare pkgs=""

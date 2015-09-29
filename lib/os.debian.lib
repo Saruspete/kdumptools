@@ -2,7 +2,7 @@ PKG_CRASH="crash"
 PKG_KDUMP="kdump"
 PKG_KEXEC="kexec-tools"
 
-function os_pkginstall  { apt-get install "$@"; }
-function os_pkgremove   { apt-get remove "$@" ; }
-function os_pkgprovides { dpkg -S "$@" ; }
-
+function os_pkginstall   { apt-get install "$@"; }
+function os_pkginstalled { dpkg-query -l "$@" ; }
+function os_pkgremove    { apt-get remove "$@" ; }
+function os_pkgprovides  { dpkg -S "$@" ; }

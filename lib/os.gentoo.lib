@@ -3,6 +3,7 @@ PKG_KEXEC="sys-apps/kexec-tools"
 PKG_KDUMP=""
 
 function os_pkginstall   { emerge "$@" ; }
+function os_pkginstalled { [[ -e "/var/db/pkg/*/$1-*" ]]; }
 function os_pkgremove    { emerge -C "$@" ; }
 function os_pkgprovides  {
 	declare file="${1:-}"
