@@ -159,7 +159,7 @@ function bin_find {
 	declare bin="$1"
 	declare oifs="$IFS"
 	IFS=:
-	for p in $PATH; do
+	for p in $PATH:/sbin:/usr/sbin; do
 		[[ -e "$p/$bin" ]] && {
 			IFS="$oifs"
 			echo "$p/$bin"
