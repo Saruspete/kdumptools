@@ -1,5 +1,8 @@
 # vim: ts=4 ft=sh
 
+# Reset lang
+export LC_ALL=C
+
 #####################################################################
 # Private library stubs
 
@@ -66,13 +69,23 @@ function logwarning {
 
 #####################################################################
 # User interaction
+declare _ASK_DEFREPLY=""
+function ask_setreply {
+	declare rep="${1:-}"
+	[[ $rep =~ ^[yYnN][eEsSoO]{0,2}$ ]] && _ASK_DEFREPLY="$rep"
+}
 
 function ask_yn {
 	declare ask="$@"
 	declare rep=""
-	while [[ ! $rep =~ ^[yYnN][eEsSoO]{0,2}$ ]]; do
-		read -p "$ask [y/n] ? " rep
-	done
+
+	if [[ -n "$_ASK_DEFREPLY" ]]; then
+		rep="$_ASK_DEFREPLY"
+	else
+		while [[ ! $rep =~ ^[yYnN][eEsSoO]{0,2}$ ]]; do
+			read -p "$ask [y/n] ? " rep
+		done
+	fi
 	[[ $rep =~ ^[yY][eEsS]{0,2} ]]
 }
 
@@ -180,5 +193,83 @@ function bin_require {
 		}
 	done
 	[[ -z "$missing" ]]
+}
+
+#####################################################################
+# Boot options
+
+function boot_getopt {
+	declare opt="$1"
+	grep -Po '(^|\s)'$opt'(=[^\s])*' /proc/cmdline
+}
+
+function boot_setopts {
+	declare opt="$1"
+	declare val="${2:-}"
+
+	# Grub
+
+}
+
+# Implementation according to official doc
+# https://www.kernel.org/doc/Documentation/kdump/kdump.txt
+function boot_getbestmemsize {
+	declare -i mem="$(sys_getmemtotal)"
+
+	declare    size=""
+	declare    arch="$(uname -m)"
+	case $arch in
+		i386|x86_64)
+			# These values are from experience. Some editors are more or less generous
+			# on the amount or ram to grant. if auto is not understood by the kernel
+			# 
+			# Redhat tells 128M + 64M/TB or RAM
+			# 2-12  : 128M
+			# 12-48 : 256M
+			# 48-128: 512M
+			if [[ $mem -le $(normalize_unit "512M") ]]; then
+				logwarning "Your system has less than 512M. Using kdump a is a bad idea..."
+				size="64M"
+			elif [[ $mem -lt $(normalize_unit "2G") ]]; then
+				size="64M"
+			else
+				size="auto"
+			fi
+			;;
+
+		ppc64)
+			if [[ "$(getconf PAGESIZE)" == "4096" ]] && [[ $mem -ge $(normalize_unit "2G") ]]; then
+				size="auto"
+			elif [[ $mem -ge $(normalize_unit "8G") ]]; then
+				size="auto"
+			elif [[ $mem -ge $(normalize_unit "2G") ]]; then
+				size="256M@32M"
+			else
+				size="128M@32M"
+			fi
+			;;
+
+		# Not tested...
+		ia64)
+			size="256M@256M"
+			;;
+
+		*)
+			logerror "Unhandled arch: $arch"
+			;;
+	esac
+
+	echo $size
+}
+
+#####################################################################
+# System
+function sys_getcputotal {
+	grep -c '^processor' /proc/cpuinfo
+}
+
+function sys_getmemtotal {
+	#awk '$1=="MemTotal:"{print $2}' /proc/meminfo
+	grep -Po '^MemTotal:\s+[0-9]+' /proc/meminfo|grep -Po '[0-9]+'
 }
 
