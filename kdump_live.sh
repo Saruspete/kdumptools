@@ -4,8 +4,6 @@ declare MYSELF="$(readlink -f $0)"
 declare MYPATH="${MYSELF%/*}"
 
 
-
-#
 source "$MYPATH/lib/kdump.lib"
 
 # Step 0 - Basic user requirements
@@ -83,18 +81,7 @@ dd if=/dev/mem of=/dev/null bs=1024 count=2048 >/dev/null 2>&1 || {
 	
 }
 
-# Step 2 - Check basic tools
-bin_require "crash" >/dev/null || {
-	if ask_yn "I require 'crash' tool to continue. Should I try to install it ?"; then
-		os_pkginstall "crash"
-	else
-		logerror ""
-		exit 20
-	fi
+# Check if we're called from kdump analyze, or directly
+grep "kdump_analyze.sh" "/proc/$PPID/comm" >/dev/null 2>&1 || {
+	$MYPATH/kdump_analyze.sh -l
 }
-
-# Step 3 - Check debuginfo
-
-
-
-# Step 4 - We're good to go

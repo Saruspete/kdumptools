@@ -8,13 +8,16 @@ declare MYPATH="${MYSELF%/*}"
 source "$MYPATH/lib/kdump.lib"
 source "$MYPATH/lib/os.lib"
 
-declare CORE_ARCH=""
-declare CORE_VERS=""
-declare CORE_PATH=""
+declare CORE_ARCH=""	# Coredump Arch
+declare CORE_VERS=""	# Coredump Release
+declare CORE_PATH=""	# Coredump path
+declare CORE_LIVE=""	# 
 declare DBUG_PATH=""
 declare DBUG_BASE=""
 declare CRSH_OPTS=""
 declare CRSH_BIN="$(bin_find "crash")"
+declare SHOW_HELP=""
+
 
 # Prefer locally compiled version
 [[ -s "$MYPATH/src/crash/bin/crash" ]] && {
@@ -28,23 +31,35 @@ function show_help {
 	echo "Options:"
 	echo "  -a --arch    Define arch to be used (guessed if omited)"
 	echo "  -r --release Define release version to be used (guessed if omited)"
+	echo "  -c --crash   Path to the 'crash' tool to be used"
+	echo "  -l --live    Analyse the live kernel"
+	echo "  -q --quiet   Be quiet"
+	echo "  -h --help    This help"
 	echo
-
+	echo "Help, code and contribution: http://github.com/saruspete/kdumptools"
 }
 
 
-eval set -- "$(getopt -o vqha:r: -l verbose,quiet,help,arch,release: -- "$@")"
+eval set -- "$(getopt -o vqhla:r:c: -l verbose,quiet,help,arch:,release:,crash: -- "$@")"
 
 while [[ -n "${1:-}" ]]; do
 	case $1 in
 		-a|--arch)		CORE_ARCH="$2"; shift 2 ;;
 		-r|--release)	CORE_VERS="$2"; shift 2 ;;
 		-c|--crash)		CRSH_BIN="$2";  shift 2 ;;
+		-l|--live)		CORE_LIVE="/dev/mem" ; shift ;;
+		-h|--help)		SHOW_HELP=1; shift ;;
+		-q|--quiet)		CRSH_OPTS="-q"; shift ;;
 		--)				shift; break ;;
 		-?*)			logerror "Unknown option: '$1'"; shift ;;
 		*)				break ;;
 	esac
 done
+
+[[ "$SHOW_HELP" == "1" ]] && {
+	show_help
+	exit 0
+}
 
 
 # System version
@@ -76,6 +91,7 @@ done
 		os_pkginstall "crash" || {
 			logerror "Error during installation of the package"
 		}
+		CRSH_BIN="$(bin_find "crash")"
 	}
 
 	# Nothing succeeded
@@ -87,7 +103,7 @@ done
 
 
 
-CORE_PATH="${1:-}"
+CORE_PATH="${1:-$CORE_LIVE}"
 [[ -z "$CORE_PATH" ]] && {
 	show_help
 	exit 1
@@ -107,7 +123,10 @@ CORE_PATH="${1:-}"
 if [[ "$CORE_PATH" =~ /dev/(mem|crash|kmem) ]]; then
 	[[ -z "$CORE_VERS" ]] && CORE_VERS="$(uname -r)"
 	[[ -z "$CORE_ARCH" ]] && CORE_ARCH="$(uname -m)"
-	logwarning "To edit your running kernel, you should use 'kdump_live.sh' instead"
+
+	grep "kdump_live.sh" /proc/$PPID/comm >/dev/null 2>&1 || {
+		logwarning "To edit your running kernel, you should start 'kdump_live.sh' instead"
+	}
 
 # Coredump file
 else
@@ -140,10 +159,10 @@ loginfo "Guessed kernel $CORE_VERS arch $CORE_ARCH"
 [[ ! -e "$DBUG_PATH" ]] && {
 	# Didn't find it. Ask user what to do
 	logwarning "Cannot find debuginfo file: $DBUG_PATH"
-	if ask_yn "Should I launch 'kdump_retrieve.sh' to get debuginfo files"; then
-		$MYPATH/kdump_retrieve.sh -v "$CORE_VERS" -a "$CORE_ARCH" -f "centos" || {
+	if ask_yn "Should I launch 'kdump_getdbg.sh' to get debuginfo files"; then
+		$MYPATH/kdump_getdbg.sh -v "$CORE_VERS" -a "$CORE_ARCH" || {
 			logerror "Unable to retrieve debuginfos (return code $?)."
-			logerror "You should check kdump_retrieve.sh or specify the path yourself"
+			logerror "You should check kdump_getdbg.sh or specify the path yourself"
 			exit 10
 		}
 	else
