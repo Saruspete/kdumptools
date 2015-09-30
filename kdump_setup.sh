@@ -22,11 +22,9 @@ declare OPT_ERRORS=""
 
 declare KRN_CONFIGFILE=""
 declare KRN_VERSION="$(uname -r)"
-declare KRN_CMDRUN="$(< /proc/cmdline)"
-declare KRN_CMDBOOT=""
 
-#declare MEM_AVAILABLE="$(awk '$1=="MemTotal:"{print $2}' /proc/meminfo)"
-declare MEM_AVAILABLE="$(grep -Po '^MemTotal:\s+[0-9]+' /proc/meminfo|grep -Po '[0-9]+')"
+declare MEM_AVAILABLE="$(sys_getmemtotal)"
+declare CPU_AVAILABLE="$(sys_getcputotal)"
 
 # Show help
 function show_help {
@@ -37,6 +35,13 @@ function show_help {
 	echo "  -q|--quiet     Do not output error"
 	echo "  -h|--help      Display this help"
 	echo "  -k|--kconf     Path to the kernel .config file"
+	echo "  -l|--location  Location where to dump the vmcore"
+	echo
+	echo "Location may be one of :"
+	echo "FS  "
+	echo "NFS "
+	echo "RAW "
+	echo "SSH "
 }
 
 
@@ -115,8 +120,7 @@ if [[ -n "$KRN_CONFIG" ]]; then
 	done
 
 else
-	logerror "Cannot find valid kernel config file"
-	logerror "You can use the -k option to specify it manually"
+	logerror "Cannot find valid kernel config file. You can use the -k option to specify it manually"
 	RET_CODE=RET_CODE+1
 fi
 
@@ -128,7 +132,7 @@ fi
 
 # kernel boot argument
 declare bootchange=""
-declare crashoption="$(echo "$KRN_CMDRUN" | grep -Po 'crashkernel=[^\s]+')"
+declare crashoption="$(boot_getopt "crashkernel")"
 if [[ -n "$crashoption" ]]; then
 	declare crashstring="${crashoption%*=}"
 	declare crashselect=""
@@ -139,6 +143,7 @@ if [[ -n "$crashoption" ]]; then
 		# Check for > 2G RAM
 		[[ "$MEM_AVAILABLE" -lt "$(normalize_unit "2G")" ]] && {
 			logerror "You have less than 2G RAM, crashkernel=auto will not work"
+			bootchange="$(boot_getbestmemsize)"
 			RET_CODE=RET_CODE+1
 		}
 	else
@@ -180,8 +185,7 @@ if [[ -n "$crashoption" ]]; then
 		fi
 	fi
 else
-	logwarning "Your system is not started with 'crashkernel=XXX' option."
-	logwarning "You'll have to reboot your system once added"
+	logerror "Your system is not started with 'crashkernel=XXX' option. You'll have to reboot your system once added"
 	RET_CODE=RET_CODE+1
 fi
 
@@ -189,8 +193,17 @@ fi
 if [[ -z "$crashoption" ]] || [[ -n "$bootchange" ]]; then
 	# Default param
 	# TODO: check for < 2G RAM
-	[[ -z "$bootchange" ]] && bootchange="crashkernel=auto"
+	[[ -z "$bootchange" ]] && bootchange="$(boot_getbestmemsize)"
 
+	if [[ "$OPT_FIX" == "1" ]] && ask_yn "Set the bootparam 'crashkernel' to '$bootchange'"; then
+		boot_setopt "crashkernel" "$bootchange" || {
+			logerror "Unable to set bootparam. Please check manually"
+			RET_CODE=RET_CODE+1
+		}
+	else
+		logerror "The bootparam 'crashkernel' should be set to '$bootchange'"
+		RET_CODE=RET_CODE+1
+	fi
 fi
 
 #
@@ -199,9 +212,9 @@ fi
 
 # Kexec
 [[ -z "$(bin_find "kexec")" ]] || {
-	if [[ "$OPT_FIX" -eq 1 ]] && [[ -n "$PKG_KEXEC" ]]; then
+	if [[ -n "$PKG_KEXEC" ]]; then
 		loginfo "Need to install kexec tools (package: $PKG_KEXEC)"
-		if ask_yn "Proceed with installation"; then
+		if [[ "$OPT_FIX" == "1" ]] && ask_yn "Proceed with installation"; then
 			os_pkginstall "$PKG_KEXEC" || {
 				logerror "Error during installation of the package"
 				RET_CODE=RET_CODE+1
@@ -211,8 +224,7 @@ fi
 			RET_CODE=RET_CODE+1
 		fi
 	else
-		logerror "Cannot find executable 'kexec' in \$PATH, and the script"
-		logerror "doesn't know the package name for your distribution"
+		logerror "Cannot find executable 'kexec' in \$PATH, and the script doesn't know the package name for your distribution"
 		RET_CODE=RET_CODE+1
 	fi
 }
@@ -222,7 +234,7 @@ if [[ -n "$PKG_KDUMP" ]]; then
 
 	# Is package installed
 	! os_pkginstalled "$PKG_KDUMP" && {
-		if [[ "$OPT_FIX" -eq 1 ]]; then
+		if [[ "$OPT_FIX" == "1" ]]; then
 			loginfo "Need to install kdump tools (package: $PKG_KDUMP)"
 			if ask_yn "Proceed with installation"; then
 				os_pkginstall "$PKG_KDUMP" || {
@@ -241,12 +253,32 @@ if [[ -n "$PKG_KDUMP" ]]; then
 
 	# Service must be started
 	os_svcenabled "kdump" || {
-		loginfo "Need to enable the service"
+		loginfo "Need to enable 'kdump' service"
+		if [[ "$OPT_FIX" == "1" ]] && ask_yn "Enable 'kdump' service"; then
+			os_svcenable "kdump" || {
+				logerror "Error during activation of the service"
+				RET_CODE=RET_CODE+1
+			}
+		else
+			logerror "The service kdump must be enabled on boot"
+			RET_CODE=RET_CODE+1
+		fi
+	}
+	os_svcstarted "kdump" || {
+		loginfo "Need to start 'kdump' service"
+		if [[ "$OPT_FIX" == "1" ]] && ask_yn "Start 'kdump' service"; then
+			os_svcstart "kdump" || {
+				logerror "Error during start of the service"
+				RET_CODE=RET_CODE+1
+			}
+		else
+			logerror "The service kdump must be started"
+			RET_CODE=RET_CODE+1
+		fi
 	}
 else
 	# TODO: Use a custom made generic kdump script
-	logwarning "The variable \$PKG_KDUMP is not set for your distribution"
-	logwarning "I cannot check if it is installed or not."
+	logwarning "The variable \$PKG_KDUMP is not set for your distribution. I cannot check if it is installed or not."
 	RET_CODE=RET_CODE+1
 fi
 
@@ -264,3 +296,4 @@ fi
 
 
 
+exit $RET_CODE
