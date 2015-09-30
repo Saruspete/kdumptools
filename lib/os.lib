@@ -25,6 +25,50 @@ function os_bininstall  {
 	os_pkginstall "$pkgs"
 }
 
+
+#
+# Init flavours and management
+#
+function os_initsystemd { grep systemd /proc/1/comm >/dev/null 2>&1 ; }
+function os_initupstart { grep upstart /proc/1/comm >/dev/null 2>&1 ; }
+function os_initopenrc  { [[ -d "/etc/runlevels/boot" ]]; }
+function os_initsysv    { [[ -d "/etc/rc.d" ]]; }
+function os_runlevel    { who -r|grep -Po 'run-level [0-9]'|grep -Po '[0-9]'; }
+
+function os_svcenable   { _lib_replaceme; }
+function os_svcdisable  { _lib_replaceme; }
+function os_svcenabled  { _lib_replaceme; }
+function os_svcdisabled { _lib_replaceme; }
+function os_svcstart    { service start $1; }
+function os_svcstop     { service stop $$; }
+
+if os_initsystemd; then
+	function os_svcenable   { systemctl enable "$1" ; }
+	function os_svcdisable  { systemctl disable "$1" ; }
+	function os_svcenabled  { systemctl is-enabled "$1" >/dev/null 2>&1 ; }
+	function os_svcdisabled { systemctl is-disabled "$1" >/dev/null 2>&1 ; }
+
+elif os_initsysv; then
+	function os_svcenable   { chkconfig "$1" on  >/dev/null 2>&1 ; }
+	function os_svcdisable  { chkconfig "$1" off >/dev/null 2>&1 ; }
+	function os_svcenabled  { chkconfig --list "$1" | grep "$(os_runlevel):on" >/dev/null ; }
+	function os_svcdisabled { chkconfig --list "$1" | grep "$(os_runlevel):off" >/dev/null ; }
+
+elif os_initopenrc; then
+	function os_svcenable   { rc-update "$1" add boot >/dev/null 2>&1 ; }
+	function os_svcdisable  { rc-update "$1" del boot >/dev/null 2>&1 ; }
+	function os_svcenabled  { rc-update show boot | grep " $1 " >/dev/null 2>&1 ; }
+	function os_svcdisabled { rc-update show boot | grep " $1 " >/dev/null 2>&1 ; }
+
+# TODO: Please somebody using ubuntu do it...
+elif os_initupstart; then
+	:
+
+else
+	logwarning "Unable to detect your init system type"
+fi
+
+
 # Load the OS related subs
 [[ -e "/etc/redhat-release" ]] && _lib_load "os.redhat"
 [[ -e "/etc/debian_version" ]] && _lib_load "os.debian"
