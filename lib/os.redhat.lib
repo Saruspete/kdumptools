@@ -1,3 +1,5 @@
+# vim: ft=sh ts=4
+
 PKG_CRASH="crash"
 PKG_KDUMP="kexec-tools"
 PKG_KEXEC="kexec-tools"
