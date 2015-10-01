@@ -1,7 +1,6 @@
 #!/bin/bash
 
 set -u
-#set -x
 
 [[ $(id -ru) != 0 ]] && {
 	echo "You should run this script as root"
@@ -27,6 +26,12 @@ declare KRN_VERSION="$(uname -r)"
 declare MEM_AVAILABLE="$(sys_getmemtotal)"
 declare CPU_AVAILABLE="$(sys_getcputotal)"
 
+declare DMP_LOCATION=""
+declare DMP_PAGETYPE=""
+declare DMP_BOOTCMD=""
+declare DMP_EXECPRE=""
+declare DMP_EXECPOST=""
+
 # Show help
 function show_help {
 	echo "Usage: $0 [options]"
@@ -47,7 +52,7 @@ function show_help {
 	echo '             "fstype" can be any FS managed by the kernel'
 	echo 'Raw device : raw:device'
 	echo 'NFS        : nfs:host/folder'
-	echo 'SSH / SCP  : ssh[%local_key_path]:host/folder'
+	echo 'SSH / SCP  : ssh[%local_key_path]:user@host/folder'
 	echo
 	echo "You can use these variables in the target folder:"
 	echo "  %HOST  "
@@ -55,8 +60,9 @@ function show_help {
 	echo
 }
 
-
+#
 # Parse options
+#
 eval set -- "$(getopt -o vqhfk:b: -l verbose,quiet,help,fix,kconf:,bootcmd: -- "$@")"
 
 while [[ -n "${1:-}" ]]; do
@@ -69,10 +75,10 @@ while [[ -n "${1:-}" ]]; do
 			KRN_CONFIGFILE="$2"
 			shift 2
 			;;
-		--bootcmd)	shift 2 ;;
-		--pagetype)	shift 2 ;;
-		--execpre)	shift 2 ;;
-		--execpost) shift 2 ;;
+		--bootcmd)		DMP_BOOTCMD="$2" ; shift 2 ;;
+		--pagetype)		DMP_PAGETPE="$2" ; shift 2 ;;
+		--execpre)		DMP_EXECPRE="$2" ; shift 2 ;;
+		--execpost)		DMP_EXECPOST="$2"; shift 2 ;;
 		# Special cases for getopt
 		--)				shift; break ;;
 		-?*)			logerror "Unknown option: '$1'"; shift ;;
@@ -111,7 +117,7 @@ elif [[ -e "/proc/config.gz" ]]; then
 
 # Usual .config locations
 else
-	for k in /usr/src/{kernels/$KRN_VERSION,linux-$KRN_VERSION}/.config; do
+	for k in /boot/config-$KRN_VERSION /usr/src/{kernels/$KRN_VERSION,linux-$KRN_VERSION}/.config; do
 		[[ -e "$k" ]] && {
 			loginfo "Using kernel config '$k'"
 			KRN_CONFIG="$(<$k)"
@@ -226,7 +232,7 @@ fi
 #
 
 # Kexec
-[[ -z "$(bin_find "kexec")" ]] || {
+[[ -z "$(bin_find "kexec")" ]] && {
 	if [[ -n "$PKG_KEXEC" ]]; then
 		loginfo "Need to install kexec tools (package: $PKG_KEXEC)"
 		if [[ "$OPT_FIX" == "1" ]] && ask_yn "Proceed with installation"; then
@@ -266,28 +272,42 @@ if [[ -n "$PKG_KDUMP" ]]; then
 		fi
 	}
 
-	# Service must be started
-	os_svcenabled "kdump" || {
-		loginfo "Need to enable 'kdump' service"
-		if [[ "$OPT_FIX" == "1" ]] && ask_yn "Enable 'kdump' service"; then
-			os_svcenable "kdump" || {
-				logerror "Error during activation of the service"
-				RET_CODE=RET_CODE+1
+	# Other checks when package is installed
+	os_pkginstalled "$PKG_KDUMP" && {
+		if os_svcexists "kdump"; then
+			os_svcenabled "kdump" || {
+				loginfo "Need to enable 'kdump' service"
+				if [[ "$OPT_FIX" == "1" ]] && ask_yn "Enable 'kdump' service"; then
+					os_svcenable "kdump" || {
+						logerror "Error during activation of the service"
+						RET_CODE=RET_CODE+1
+					}
+				else
+					logerror "The service kdump must be enabled on boot"
+					RET_CODE=RET_CODE+1
+				fi
 			}
 		else
-			logerror "The service kdump must be enabled on boot"
+			logerror "Seems there is no kdump service in your distribution. Thats strange..."
 			RET_CODE=RET_CODE+1
 		fi
-	}
-	os_svcstarted "kdump" || {
-		loginfo "Need to start 'kdump' service"
-		if [[ "$OPT_FIX" == "1" ]] && ask_yn "Start 'kdump' service"; then
-			os_svcstart "kdump" || {
-				logerror "Error during start of the service"
-				RET_CODE=RET_CODE+1
+
+		# Check kexec is started
+		if [[ -e "/sys/kernel/kexec_crash_loaded" ]]; then
+			os_pkginstalled "$PKG_KDUMP" && [[ "$(</sys/kernel/kexec_crash_loaded)" == "0" ]] && {
+				loginfo "Need to start 'kdump' service"
+				if [[ "$OPT_FIX" == "1" ]] && ask_yn "Start 'kdump' service"; then
+					os_svcstart "kdump" || {
+						logerror "Error during start of the service"
+						RET_CODE=RET_CODE+1
+					}
+				else
+					logerror "The service kdump must be started"
+					RET_CODE=RET_CODE+1
+				fi
 			}
 		else
-			logerror "The service kdump must be started"
+			logerror "Your kernel is missing SYSFS support"
 			RET_CODE=RET_CODE+1
 		fi
 	}
@@ -300,8 +320,93 @@ fi
 #
 # Step 4 - kdump configuration
 #
-[[ -e "/etc/kdump.conf" ]] && {
-	:
+declare kdumpconf="/etc/kdump.conf"
+[[ -e "$kdumpconf" ]] && {
+
+	loginfo "Configuring kdump.conf"
+
+	declare kdconf="$(<$kdumpconf)"
+
+	#
+	# Dump location configuration
+	#
+
+	# Discard all fs types and fs
+	declare lfsrgx=""
+	declare ftypes="$(grep -oP '[^\s]+$' /proc/filesystems)"
+	for ft in path raw nfs ssh $ftypes; do
+		[[ -n "$lfsrgx" ]] && lfsrgx="$lfsrgx|"
+		lfsrgx="$lfsrgx$ft"
+	done
+	declare fsrgx="$lfsrgx|path|raw|nfs|ssh"
+
+	kdconf="$(echo "$kdconf"|grep -vP '^\s*'$fsrgx)"
+	
+	# Add the requested ones
+	if [[ -n "$DMP_LOCATION" ]]; then
+		declare ft="${DMP_LOCATION%%:*}"
+		declare arg="${DMP_LOCATION#*:}"
+		declare path="/var/crash/%HOST-%DATE"
+		# 
+		case $ft in
+			$lfsrgx)
+				declare fstype="$ft"
+
+				;;
+
+			# ssh%/root/id_dsa.key:user@host:/remote/path/
+			ssh|ssh%*)
+				declare keyf="${ft%ssh%}"
+				declare user="${arg%%@*}"
+				declare host="${arg}"
+				
+				[[ "$keyf" != "ssh" ]] && {
+					kdconf="$kdconf\nsshkey $keyf"
+				}
+				
+				kdconf="$kdconf\nssh ${host}:${arg}"
+				;;
+
+			# nfs:host:/remote/path
+			nfs) 
+				declare host="${arg%%/*}"
+				declare mnt="${arg#*/}"
+				kdconf="$kdconf\nnfs $host:$mnt"
+				;;
+
+			# raw:/dev/device
+			raw)
+				declare dev="${arg}"
+				if [[ -b "$dev" ]]; then
+					kdconf="$kdconf\nraw $dev"
+				else
+					logerror "kconf: raw device '$dev' is not available"
+				fi
+				;;
+		esac
+
+		kdconf="$kdconf\npath $path"
+
+	# Default value: root path & /var/crash
+	else
+		kdconf="$kdconf\npath /var/crash"
+	fi
+
+	#
+	# core_collector
+	#
+
+	#core_collector makedumpfile -l --message-level 1 -d 31
+
+	#
+	# Script
+	#
+	#kdump_pre
+	#kdump_post
+
+
+	mv "$kdumpconf" "$kdumpconf.bak"
+	echo -e "$kdconf" > "$kdumpconf"
 }
 
 
