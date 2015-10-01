@@ -21,6 +21,7 @@ declare OPT_HELP=0
 declare OPT_ERRORS=""
 
 declare KRN_CONFIGFILE=""
+declare KRN_CONFIG=""
 declare KRN_VERSION="$(uname -r)"
 
 declare MEM_AVAILABLE="$(sys_getmemtotal)"
@@ -31,22 +32,32 @@ function show_help {
 	echo "Usage: $0 [options]"
 	echo
 	echo "Options:"
-	echo "  -f|--fix       Fix errors when possible"
-	echo "  -q|--quiet     Do not output error"
-	echo "  -h|--help      Display this help"
-	echo "  -k|--kconf     Path to the kernel .config file"
-	echo "  -l|--location  Location where to dump the vmcore"
+	echo "  -f|--fix        Fix errors when possible"
+	echo "  -q|--quiet      Do not output error"
+	echo "  -h|--help       Display this help"
+	echo "  -k|--kconf      Path to the kernel .config file"
+	echo "  -l|--location   Location where to dump the vmcore"
+	echo "     --bootcmd    Args to append to kexec'd kernel"
+	echo "     --pagetype   Page types mask to be selected (default 31, see makedumpfile)"
+#	echo "     --execpre    Script to execute prior dumping"
+#	echo "     --execpost   Script to execute after dumping"
 	echo
 	echo "Location may be one of :"
-	echo "FS  "
-	echo "NFS "
-	echo "RAW "
-	echo "SSH "
+	echo 'Filesystem : fstype:<device|label|uuid>@mountpoint'
+	echo '             "fstype" can be any FS managed by the kernel'
+	echo 'Raw device : raw:device'
+	echo 'NFS        : nfs:host/folder'
+	echo 'SSH / SCP  : ssh[%local_key_path]:host/folder'
+	echo
+	echo "You can use these variables in the target folder:"
+	echo "  %HOST  "
+	echo "  %DATE  "
+	echo
 }
 
 
 # Parse options
-eval set -- "$(getopt -o vqhfk: -l verbose,quiet,help,kconf: -- "$@")"
+eval set -- "$(getopt -o vqhfk:b: -l verbose,quiet,help,fix,kconf:,bootcmd: -- "$@")"
 
 while [[ -n "${1:-}" ]]; do
 	case $1 in
@@ -58,6 +69,10 @@ while [[ -n "${1:-}" ]]; do
 			KRN_CONFIGFILE="$2"
 			shift 2
 			;;
+		--bootcmd)	shift 2 ;;
+		--pagetype)	shift 2 ;;
+		--execpre)	shift 2 ;;
+		--execpost) shift 2 ;;
 		# Special cases for getopt
 		--)				shift; break ;;
 		-?*)			logerror "Unknown option: '$1'"; shift ;;
