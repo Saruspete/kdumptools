@@ -155,7 +155,7 @@ fi
 declare bootchange=""
 declare crashoption="$(boot_getopt "crashkernel")"
 if [[ -n "$crashoption" ]]; then
-	declare crashstring="${crashoption%*=}"
+	declare crashstring="${crashoption##*=}"
 	declare crashselect=""
 	declare crashoffset=""
 
@@ -371,7 +371,8 @@ declare kdumpconf="/etc/kdump.conf"
 			nfs) 
 				declare host="${arg%%/*}"
 				declare mnt="${arg#*/}"
-				kdconf="$kdconf\nnfs $host:$mnt"
+				path=""
+				kdconf="$kdconf\nnfs $host:/$mnt"
 				;;
 
 			# raw:/dev/device
@@ -384,11 +385,11 @@ declare kdumpconf="/etc/kdump.conf"
 				fi
 				;;
 		esac
-
-		kdconf="$kdconf\npath $path"
+		[[ -n "$path" ]] && kdconf="$kdconf\npath $path"
 
 	# Default value: root path & /var/crash
 	else
+		loginfo "Using default path to /var/crash"
 		kdconf="$kdconf\npath /var/crash"
 	fi
 
