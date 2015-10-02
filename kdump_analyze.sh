@@ -130,13 +130,10 @@ if [[ "$CORE_PATH" =~ /dev/(mem|crash|kmem) ]]; then
 
 # Coredump file
 else
-	declare OIFS=$IFS
-	IFS="\n"
 	for word in $(head -n1 $CORE_PATH|strings); do
 		[[ -z "$CORE_VERS" ]] && [[ "$word" =~ ^[0-9\.\-]{3,} ]] && CORE_VERS="$word"
 		[[ -z "$CORE_ARCH" ]] && [[ "$word" =~ ^[xi][0-9_]+$ ]]  && CORE_ARCH="$word"
 	done
-	IFS=$OIFS
 fi
 
 # Remove additionnal arch version
@@ -153,7 +150,7 @@ CORE_VERS="${CORE_VERS%%.$CORE_ARCH}"
 
 loginfo "Guessed kernel $CORE_VERS arch $CORE_ARCH"
 
-[[ -z "$DBUG_PATH" ]] && DBUG_PATH="$DBUG_BASE/$CORE_ARCH/usr/lib/debug/lib/modules/$CORE_VERS/vmlinux"
+[[ -z "$DBUG_PATH" ]] && DBUG_PATH="$DBUG_BASE/usr/lib/debug/lib/modules/$CORE_VERS.$CORE_ARCH/vmlinux"
 
 # Check for debuginfo
 [[ ! -e "$DBUG_PATH" ]] && {
