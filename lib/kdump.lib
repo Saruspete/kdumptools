@@ -200,15 +200,46 @@ function bin_require {
 
 function boot_getopt {
 	declare opt="$1"
-	grep -Po '(^|\s)'$opt'(=[^\s])*' /proc/cmdline
+	grep -Po '(^|\s)'$opt'(=[^\s]*)?' /proc/cmdline
 }
 
-function boot_setopts {
+function boot_setopt {
 	declare opt="$1"
 	declare val="${2:-}"
+	declare -i r=0
 
 	# Grub
+	for f in /boot/grub{,2}/grub{,2}.{conf,cfg}; do
+		[[ -e "$f" ]] || continue
+		
+		declare o="$opt"
+		[[ -n "$val" ]] && o="$o=$val"
 
+		if [[ -n "$(bin_find sed)" ]]; then
+			# Remove requested elements
+			sed -Ee '/^\s*(linux|kernel)/s/ '$opt'=?[^ ]+//g' -i "$f"
+			# And add the new
+			sed -Ee '/^\s*(linux|kernel)/s/$/ '$o'/' -i "$f"
+
+			r=$?
+		else
+			r=1
+		fi
+
+	done
+	
+	# TODO: OS Specific
+	[[ -e /etc/sysconfig/grub ]] && {
+		# GRUB_CMDLINE_LINUX=crashkernel
+		:
+	}
+
+	# TODO: mkconfig
+	[[ -n "$(bin_find grub-mkconfig)" ]] && {
+		:
+	}
+
+	return $r
 }
 
 # Implementation according to official doc
