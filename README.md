@@ -2,7 +2,10 @@ kdumptools
 ==========
 
 The kdumptools is a set of scripts to help you working with Kernel Dumps.
-When your system is unresponsive, 
+
+When your system is unresponsive, it's always better to know what caused the hang. Let it be a human error, a kernel fault, a memory leak or a hardware issue.
+Instead of rebooting and loosing all clues, save the memory with kdump (in a file, nfs or ssh) then reboot. You'll be able to analyze the system state afterwards.
+
 
 ## How to use it / requirements
 
@@ -38,7 +41,8 @@ Other script langage ? We're doing sysadmin here. Not a website
 
 
 ## More details about kdump
-You can find the slides of the Kernel-Recipes 2015 lightning-talk here : 
+You can find the slides of the Kernel-Recipes 2015 lightning-talk here :
+http://www.slideshare.net/Saruspete/kernel-crashdump-53496836
 
 ### Contact
 Author : Adrien Mahieux <adrien.mahieux@gmail.com>  - Sysadmin
