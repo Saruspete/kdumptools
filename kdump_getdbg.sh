@@ -5,7 +5,7 @@ set -u
 declare MYSELF="$(readlink -f $0)"
 declare MYPATH="${MYSELF%/*}"
 
-source "$MYPATH/lib/kdump.lib"
+source "$MYPATH/lib/main.lib"
 
 declare    DBUG_ARCH=""
 declare    DBUG_VERS=""

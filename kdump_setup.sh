@@ -10,7 +10,7 @@ set -u
 declare MYSELF="$(readlink -f $0)"
 declare MYPATH="${MYSELF%/*}"
 
-source "$MYPATH/lib/kdump.lib"
+source "$MYPATH/lib/main.lib"
 source "$MYPATH/lib/os.lib"
 
 declare -i RET_CODE=0
@@ -414,6 +414,8 @@ declare kdumpconf="/etc/kdump.conf"
 #
 # Step 5 - kdump initrd image generation
 #
+
+# mkdumprd
 
 
 

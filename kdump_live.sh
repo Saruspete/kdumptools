@@ -4,7 +4,7 @@ declare MYSELF="$(readlink -f $0)"
 declare MYPATH="${MYSELF%/*}"
 
 
-source "$MYPATH/lib/kdump.lib"
+source "$MYPATH/lib/main.lib"
 
 # Step 0 - Basic user requirements
 [[ -r /dev/mem ]] && [[ -w /dev/mem ]] || {
