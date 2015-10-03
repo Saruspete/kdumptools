@@ -5,7 +5,7 @@ set -u
 declare MYSELF="$(readlink -f $0)"
 declare MYPATH="${MYSELF%/*}"
 
-source "$MYPATH/lib/kdump.lib"
+source "$MYPATH/lib/main.lib"
 source "$MYPATH/lib/os.lib"
 
 declare CORE_ARCH=""	# Coredump Arch
@@ -13,7 +13,7 @@ declare CORE_VERS=""	# Coredump Release
 declare CORE_PATH=""	# Coredump path
 declare CORE_LIVE=""	# 
 declare DBUG_PATH=""
-declare DBUG_BASE=""
+declare DBUG_BASE="$MYPATH/dbg"
 declare CRSH_OPTS=""
 declare CRSH_BIN="$(bin_find "crash")"
 declare SHOW_HELP=""
@@ -132,7 +132,8 @@ if [[ "$CORE_PATH" =~ /dev/(mem|crash|kmem) ]]; then
 else
 	for word in $(head -n1 $CORE_PATH|strings); do
 		[[ -z "$CORE_VERS" ]] && [[ "$word" =~ ^[0-9\.\-]{3,} ]] && CORE_VERS="$word"
-		[[ -z "$CORE_ARCH" ]] && [[ "$word" =~ ^[xi][0-9_]+$ ]]  && CORE_ARCH="$word"
+		#[[ -z "$CORE_ARCH" ]] && [[ "$word" =~ ^[xi][0-9_]+$ ]]  && CORE_ARCH="$word"
+		[[ -z "$CORE_ARCH" ]] && [[ "$word" =~ ^(x86_|i386|ppc|ia|arm|x390)(64)?$ ]]  && CORE_ARCH="$word"
 	done
 fi
 
@@ -150,7 +151,12 @@ CORE_VERS="${CORE_VERS%%.$CORE_ARCH}"
 
 loginfo "Guessed kernel $CORE_VERS arch $CORE_ARCH"
 
-[[ -z "$DBUG_PATH" ]] && DBUG_PATH="$DBUG_BASE/usr/lib/debug/lib/modules/$CORE_VERS.$CORE_ARCH/vmlinux"
+declare dbug_ext="/usr/lib/debug/lib/modules/$CORE_VERS.$CORE_ARCH/vmlinux"
+# Check system path by default
+[[ -z "$DBUG_PATH" ]] && [[ -e "$dbug_ext" ]] && DBUG_PATH="$dbug_ext"
+
+# Check on our custom path
+[[ -z "$DBUG_PATH" ]] && DBUG_PATH="$DBUG_BASE/$dbug_ext"
 
 # Check for debuginfo
 [[ ! -e "$DBUG_PATH" ]] && {
