@@ -122,20 +122,19 @@ function file_requireaccess {
 function file_fetch {
 	declare src="${1:-}"
 	declare dst="${2:-$(file_gettemp)}"
+#	[[ -d
+#	dst="$dst/${src##*/}"
 
 	declare ret=1
 
 	# Curl
-	bin_find curl >/dev/null && {
+	if [[ -n "$(bin_find curl)" ]]; then
 		curl --create-dirs -o "$dst" "$src" 2>/dev/null
 		ret=$?
-	}
-
-	# wget
-	bin_find wget >/dev/null && {
+	elif [[ -n "$(bin_find wget)" ]]; then
 		wget -O "$dst" "$src" 2>/dev/null
 		ret=$?
-	}
+	fi
 
 	[[ -s "$dst" ]] && echo "$dst"
 	return $ret
