@@ -121,6 +121,7 @@ else
 		[[ -e "$k" ]] && {
 			loginfo "Using kernel config '$k'"
 			KRN_CONFIG="$(<$k)"
+			break
 		}
 	done
 fi
@@ -163,9 +164,8 @@ if [[ -n "$crashoption" ]]; then
 	if [[ "$crashstring" == "auto" ]]; then
 		# Check for > 2G RAM
 		[[ "$MEM_AVAILABLE" -lt "$(normalize_unit "2G")" ]] && {
-			logerror "You have less than 2G RAM, crashkernel=auto will not work"
+			logerror "You have less than 2G RAM, current 'crashkernel=auto' will not work"
 			bootchange="$(boot_getbestmemsize)"
-			RET_CODE=RET_CODE+1
 		}
 	else
 		# Parsing for multiple selection (512M-2G:64M,2G-:128M)
@@ -274,35 +274,43 @@ if [[ -n "$PKG_KDUMP" ]]; then
 
 	# Other checks when package is installed
 	os_pkginstalled "$PKG_KDUMP" && {
-		if os_svcexists "kdump"; then
-			os_svcenabled "kdump" || {
-				loginfo "Need to enable 'kdump' service"
-				if [[ "$OPT_FIX" == "1" ]] && ask_yn "Enable 'kdump' service"; then
-					os_svcenable "kdump" || {
-						logerror "Error during activation of the service"
+		# Some distribs calls it kdump, other kdump-tools...
+		declare svcname=""
+		for svc in kdump kdump-tools; do
+			os_svcexists "$svc" && {
+				# This service exists, save it for later
+				svcname="$svc"
+				os_svcenabled "$svc" || {
+					loginfo "Need to enable '$svc' service"
+					if [[ "$OPT_FIX" == "1" ]] && ask_yn "Enable '$svc' service"; then
+						os_svcenable "kdump" || {
+							logerror "Error during activation of the service"
+							RET_CODE=RET_CODE+1
+						}
+					else
+						logerror "The service '$svc' must be enabled on boot"
 						RET_CODE=RET_CODE+1
-					}
-				else
-					logerror "The service kdump must be enabled on boot"
-					RET_CODE=RET_CODE+1
-				fi
+					fi
+				}
 			}
-		else
+		done
+
+		[[ -z "$svcname" ]] && {
 			logerror "Seems there is no kdump service in your distribution. Thats strange..."
 			RET_CODE=RET_CODE+1
-		fi
+		}
 
 		# Check kexec is started
 		if [[ -e "/sys/kernel/kexec_crash_loaded" ]]; then
-			os_pkginstalled "$PKG_KDUMP" && [[ "$(</sys/kernel/kexec_crash_loaded)" == "0" ]] && {
-				loginfo "Need to start 'kdump' service"
-				if [[ "$OPT_FIX" == "1" ]] && ask_yn "Start 'kdump' service"; then
-					os_svcstart "kdump" || {
+			[[ "$(</sys/kernel/kexec_crash_loaded)" == "0" ]] && {
+				loginfo "Need to start '$svcname' service"
+				if [[ "$OPT_FIX" == "1" ]] && ask_yn "Start '$svcname' service"; then
+					os_svcstart "$svcname" || {
 						logerror "Error during start of the service"
 						RET_CODE=RET_CODE+1
 					}
 				else
-					logerror "The service kdump must be started"
+					logerror "The service '$svcname' must be started"
 					RET_CODE=RET_CODE+1
 				fi
 			}
