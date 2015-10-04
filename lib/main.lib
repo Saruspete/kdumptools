@@ -253,8 +253,8 @@ function boot_getbestmemsize {
 			# 2-12  : 128M
 			# 12-48 : 256M
 			# 48-128: 512M
-			if [[ $mem -le $(normalize_unit "512M") ]]; then
-				logwarning "Your system has less than 512M. Using kdump a is a bad idea..."
+			if [[ $mem -lt $(normalize_unit "512M") ]]; then
+				logwarning "Your system has less than 512M RAM... crashkernel will also take you 64M"
 				size="64M"
 			elif [[ $mem -lt $(normalize_unit "2G") ]]; then
 				size="64M"
