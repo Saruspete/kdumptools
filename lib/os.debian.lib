@@ -1,5 +1,5 @@
 PKG_CRASH="crash"
-PKG_KDUMP="kdump"
+PKG_KDUMP="kdump-tools"
 PKG_KEXEC="kexec-tools"
 
 function os_pkginstall   { apt-get install "$@" >/dev/null 2>&1; }
