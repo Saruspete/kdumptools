@@ -418,5 +418,8 @@ declare kdumpconf="/etc/kdump.conf"
 # mkdumprd
 
 
+[[ "$RET_CODE" != "0" ]] && [[ "$OPT_FIX" != "1" ]] && {
+	logwarning "Errors were detected. The script can try to fix them if you launch it with option '-f'"
+}
 
 exit $RET_CODE
