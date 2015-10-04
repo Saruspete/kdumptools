@@ -108,8 +108,7 @@ function download_debian {
 
 	# ar + tar else
 	elif [[ -n "$(bin_find ar)" ]]; then
-		ar x "$file" "data.tar.gz"
-		tar -C "$DBUG_BASE" -zxf "data.tar.gz"
+		ar p "$file" "data.tar.gz" | tar -C "$DBUG_BASE" -zx
 
 	# Well, now I can't do anything for you
 	else
