@@ -68,11 +68,12 @@ function download_redhat {
 	
 	# Download rpm for kernel and kernel-common-$arch
 	for url in $urlbase/kernel-debuginfo{,-common-$arch}-$ext; do
+		loginfo "Downloading '$url' (this may not be the good one)"
 		declare fetch="$(file_fetch "$url" "$DBUG_TEMP")"
-		[[ -s "$fetch" ]] || { logerror "Unable to download '$url'"; exit 1; }
+		[[ -s "$fetch" ]] || { logerror "Unable to download '$url'"; return 1; }
 		(
 			cd "$DBUG_BASE"
-			rpm2cpio "$fetch"|cpio -idm || exit $?
+			rpm2cpio "$fetch"|cpio -idm || return 1
 		)
 		ret=ret+$?
 	done
@@ -81,14 +82,51 @@ function download_redhat {
 }
 
 
+function download_debian {
+	declare urlbase="$1"
+
+	declare -i ret=0
+	declare arch="$DBUG_ARCH"
+	[[ "$arch" == "x86_64" ]] && arch="amd64"
+
+	# Fetch the full index
+	loginfo "Getting file index from $urlbase"
+	declare fileidx="$(file_fetch "$urlbase/" "$DBUG_TEMP/idxdeb_$DBUG_VERS.$arch.html")"
+	[[ -s "$fileidx" ]] || { logerror "Unable to download index of '$urlbase'"; return 1; }
+	declare url="$urlbase/$(grep -oP "linux-image-$DBUG_VERS-dbg(.+?)_$arch.d?deb" "$fileidx"|tail -1)"
+	declare dst="$DBUG_TEMP/linux-image-$DBUG_VERS-dbg.$arch.deb"
+
+	# Fetch the target file
+	loginfo "Downloading '$url' to '$dst'"
+	declare file="$(file_fetch "$url" "$dst")"
+	[[ -s "$file" ]] || { logerror "Unable to download '$url'"; return 1; }
+
+	loginfo "Extracting package to '$DBUG_BASE'"
+	# dpkg if available
+	if [[ -n "$(bin_find dpkg-deb)" ]]; then
+		dpkg-deb -x "$file" "$DBUG_BASE"
+
+	# ar + tar else
+	elif [[ -n "$(bin_find ar)" ]]; then
+		ar x "$file" "data.tar.gz"
+		tar -C "$DBUG_BASE" -zxf "data.tar.gz"
+
+	# Well, now I can't do anything for you
+	else
+		logerror "You need 'dpkg' or 'ar' + 'tar' to extract debian packages"
+		return 1
+	fi
+}
 
 declare -i retcode=0
 
 case $DIST_FAMI-$DIST_FLAV in
+	#
 	# Test for all RPM based systems
+	#
 	redhat-*)
 		[[ -z "$(bin_find "rpm2cpio")" ]] && {
-			logerror "Missing binary rpm2cpio. If you're not on a rpm-based system, you need this tool"
+			logerror "Missing rpm2cpio tool. If you're not on a rpm-based system, you need this tool"
 			exit 1
 		}
 		;;&
@@ -105,8 +143,10 @@ case $DIST_FAMI-$DIST_FLAV in
 
 		# Tries releases and updates
 		download_redhat "http://fedora.mirrors.ovh.net/linux/releases/$rel/Everything/$DBUG_ARCH/debug/k" "$ext" || 
-		download_redhat "http://fedora.mirrors.ovh.net/linux/updates/$rel/$DBUG_ARCH/debug/k" "$ext"
-		retcode=$?
+		download_redhat "http://fedora.mirrors.ovh.net/linux/updates/$rel/$DBUG_ARCH/debug/k" "$ext" || {
+			retcode=$?
+			logerror "Unable to download your release. Fedora updates are quick, try to keep them up !"
+		}
 		;;
 
 	redhat-centos)
@@ -123,11 +163,31 @@ case $DIST_FAMI-$DIST_FLAV in
 		retcode=99
 		;;
 
+	#
 	# test for all DEB based systems
+	#
 	debian-*)
-		
+		[[ -z "$(bin_find "dpkg-deb")$(bin_find "ar")" ]] && {
+			logerror "You need at least 'dpkg-deb' or 'ar' to extract .deb"
+			exit 1
+		}
+		;;&
+	
+	debian-debian)
+		# http://ftp.us.debian.org/debian/pool/main/l/linux/linux-image-4.2.0-1-amd64-dbg_4.2.1-2_amd64.deb
+		download_debian "http://ftp.us.debian.org/debian/pool/main/l/linux"
+		retcode=$?
 		;;
 
+	debian-ubuntu)
+		# http://ddebs.ubuntu.com/pool/main/l/linux/linux-image-4.2.0-14-generic-dbgsym_4.2.0-14.16_amd64.ddeb
+		download_debian "http://ddebs.ubuntu.com/pool/main/l/linux"
+		retcode=$?
+		;;
+
+	#
+	# Unknown distribution
+	#
 	*)
 		logerror "Unknown distribution type: '$DIST_FAMI-$DIST_FLAV'"
 		exit 1
