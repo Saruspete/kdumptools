@@ -76,7 +76,7 @@ function os_svcstart    { service $1 start; }
 function os_svcstop     { service $1 stop; }
 
 if os_initsystemd; then
-	function os_svcexists   { systemctl list-units --all | grep " $1.service" >/dev/null ; }
+	function os_svcexists   { systemctl list-units --all | grep "$1.service" >/dev/null ; }
 	function os_svcenable   { systemctl enable "$1"  >/dev/null 2>&1 ; }
 	function os_svcdisable  { systemctl disable "$1" >/dev/null 2>&1 ; }
 	function os_svcenabled  { systemctl is-enabled "$1" >/dev/null 2>&1 ; }
