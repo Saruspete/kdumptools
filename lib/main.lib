@@ -122,14 +122,16 @@ function file_requireaccess {
 function file_fetch {
 	declare src="${1:-}"
 	declare dst="${2:-$(file_gettemp)}"
-#	[[ -d
-#	dst="$dst/${src##*/}"
+	
+	# If the requested url is a folder, remove trailing /
+	src="${src%/}"
+	[[ -d "$dst" ]] && dst="$dst/${src##*/}"
 
 	declare ret=1
 
 	# Curl
 	if [[ -n "$(bin_find curl)" ]]; then
-		curl --create-dirs -o "$dst" "$src" 2>/dev/null
+		curl -fs --create-dirs -o "$dst" "$src" 2>/dev/null
 		ret=$?
 	elif [[ -n "$(bin_find wget)" ]]; then
 		wget -O "$dst" "$src" 2>/dev/null
