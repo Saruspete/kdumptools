@@ -5,16 +5,47 @@ declare PKG_CRASH=""
 declare PKG_KDUMP=""
 declare PKG_KEXEC=""
 
-# Define some subs to be defined
+#
+# OS Family
+#
+function os_getid {
+	declare -l fam=""
+	declare -l fla=""
+	declare -l tmp=""
+
+	# Common description
+	for f in redhat gentoo SuSE os system; do
+		[[ -e "/etc/${f}-release" ]] && {
+			tmp="$(head -n1 /etc/${f}-release)"
+			fam="$f"
+			fla="${tmp%% *}"
+			break
+		}
+	done
+	# Debian based. No standard way for the family on this
+	[[ -e "/etc/debian_version" ]] && {
+		fam="debian"
+		fla="debian"
+	}
+	# LSB standard
+	[[ -e "/etc/lsb-release" ]] && {
+		tmp="$(grep "^DISTRIB_ID=" "/etc/lsb-release")"
+		[[ -n "$tmp" ]] && fla="${tmp#*=}"
+	}
+
+	echo "$fam/$fla"
+}
+
+function os_getdbginfo   { _lib_replaceme; }
+
+#
+# Package management
+#
 function os_pkgextract   { _lib_replaceme; }
 function os_pkginstall   { _lib_replaceme; }
 function os_pkginstalled { _lib_replaceme; }
 function os_pkgremove    { _lib_replaceme; }
 function os_pkgprovides  { _lib_replaceme; }
-
-function os_getflavour   { _lib_replaceme; }
-function os_kern2release { _lib_replaceme; }
-function os_getdbginfo   { _lib_replaceme; }
 
 function os_bininstall  {
 	declare pkgs=""
@@ -74,7 +105,8 @@ fi
 
 
 # Load the OS related subs
-[[ -e "/etc/redhat-release" ]] && _lib_load "os.redhat"
-[[ -e "/etc/debian_version" ]] && _lib_load "os.debian"
-[[ -e "/etc/gentoo-release" ]] && _lib_load "os.gentoo"
+declare os_id="$(os_getid)"
+declare os_family="${os_id%/*}"
+declare os_flavor="${os_id#*/}"
+_lib_load "os.${os_family}"
 
