@@ -244,6 +244,11 @@ function boot_getbestmemsize {
 
 	declare    size=""
 	declare    arch="$(uname -m)"
+	declare    minram="64M"
+
+	# Increase min ram for debian
+	[[ "$(os_getid)" =~ ^debian- ]] && minram="128M"
+
 	case $arch in
 		i386|x86_64)
 			# These values are from experience. Some editors are more or less generous
@@ -254,10 +259,10 @@ function boot_getbestmemsize {
 			# 12-48 : 256M
 			# 48-128: 512M
 			if [[ $mem -lt $(normalize_unit "512M") ]]; then
-				logwarning "Your system has less than 512M RAM... crashkernel will also take you 64M"
-				size="64M"
+				logwarning "Your system has less than 512M RAM... crashkernel will also take you $minram"
+				size="$minram"
 			elif [[ $mem -lt $(normalize_unit "2G") ]]; then
-				size="64M"
+				size="128M"
 			else
 				size="auto"
 			fi
