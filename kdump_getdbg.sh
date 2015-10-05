@@ -12,15 +12,22 @@ declare    DBUG_VERS=""
 declare    DBUG_BASE="$MYPATH/dbg"
 declare    DBUG_TEMP="$DBUG_BASE/tmp"
 declare    SHOW_HELP=""
-declare -l DIST_FAMI=""
-declare -l DIST_FLAV=""
-
+declare -l DIST_NAME=""
+declare    REPO_LOCAL=""
 
 function show_help {
-	echo "Usage: $0 -a ARCH -r RELEASE -f FAMILY -F FLAVOR"
+	echo "Usage: $0 -a ARCH -r RELEASE -o OSNAME [-l LOCALREPO]"
 	echo
 	echo "  Options:"
+	echo "  OSNAME in:"
+	echo "    redhat-redhat"
+	echo "    redhat-fedora"
+	echo "    redhat-centos"
 	echo
+	echo "    debian-debian"
+	echo "    debian-ubuntu"
+	echo
+	echo "    "
 }
 
 
@@ -30,8 +37,8 @@ while [[ -n "${1:-}" ]]; do
 	case $1 in
 		-a|--arch)		DBUG_ARCH="$2"; shift 2 ;;
 		-r|--release)	DBUG_VERS="$2"; shift 2 ;;
-		-f|--family)	DIST_FAMI="$2"; shift 2 ;;
-		-F|--flavor)	DIST_FLAV="$2";  shift 2 ;;
+		-o|--osname)	DIST_NAME="$2"; shift 2 ;;
+		-l|--localrepo)	REPO_LOCAL="$2"; shift 2 ;;
 		-h|--help)		SHOW_HELP=1; shift ;;
 		-q|--quiet)		shift ;;
 		--)				shift; break ;;
@@ -47,11 +54,14 @@ done
 }
 
 # Required arguments
-[[ -z "$DBUG_ARCH" ]] && { logerror "Missing argument '-a|--arch'" ; exit 1 ; }
-[[ -z "$DBUG_VERS" ]] && { logerror "Missing argument '-r|--release'" ; exit 1 ; }
-[[ -z "$DIST_FAMI" ]] && { logerror "Missing argument '-f|--family'" ; exit 1 ; }
-[[ -z "$DIST_FLAV" ]] && { logerror "Missing argument '-F|--flavor'" ; exit 1 ; }
-
+declare misarg=""
+[[ -z "$DBUG_ARCH" ]] && { misarg="${misarg}\n '-a|--arch'" ; }
+[[ -z "$DBUG_VERS" ]] && { misarg="${misarg}\n '-r|--release'" ; }
+[[ -z "$DIST_NAME" ]] && { misarg="${misarg}\n '-o|--osname'" ; }
+[[ -n "$misarg" ]] && {
+	logerror "Missing arugments: $misarg"
+	exit 1
+}
 
 # Create target and temp folder
 [[ -d "$DBUG_BASE" ]] || mkdir -p "$DBUG_BASE" || exit 2
@@ -119,7 +129,7 @@ function download_debian {
 
 declare -i retcode=0
 
-case $DIST_FAMI-$DIST_FLAV in
+case $DIST_OSNAME in
 	#
 	# Test for all RPM based systems
 	#
@@ -157,7 +167,7 @@ case $DIST_FAMI-$DIST_FLAV in
 		retcode="$?"
 		;;
 
-	redhat-rhel)
+	redhat-redhat)
 		logerror "Redhat doesn't provide public repositories. See https://access.redhat.com/solutions/9907"
 		retcode=99
 		;;
@@ -185,10 +195,14 @@ case $DIST_FAMI-$DIST_FLAV in
 		;;
 
 	#
+	# SuSE TODO
+	#
+
+	#
 	# Unknown distribution
 	#
 	*)
-		logerror "Unknown distribution type: '$DIST_FAMI-$DIST_FLAV'"
+		logerror "Unknown distribution name : '$DIST_OSNAME'"
 		exit 1
 		;;
 
