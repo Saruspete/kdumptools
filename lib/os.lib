@@ -107,7 +107,7 @@ fi
 
 # Load the OS related subs
 declare os_id="$(os_getid)"
-declare os_family="${os_id%/*}"
-declare os_flavor="${os_id#*/}"
+declare os_family="${os_id%-*}"
+declare os_flavor="${os_id#*-}"
 _lib_load "os.${os_family}"
 
