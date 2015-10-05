@@ -22,7 +22,8 @@ function os_getid {
 			break
 		}
 	done
-	# Debian based. No standard way for the family on this
+
+	# Debian based. No standard way for the flavour on this
 	[[ -e "/etc/debian_version" ]] && {
 		fam="debian"
 		fla="debian"
@@ -33,7 +34,7 @@ function os_getid {
 		[[ -n "$tmp" ]] && fla="${tmp#*=}"
 	}
 
-	echo "$fam/$fla"
+	echo "${fam}-${fla}"
 }
 
 function os_getdbginfo   { _lib_replaceme; }
