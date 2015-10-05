@@ -1,0 +1,37 @@
+# vim: ft=sh ts=4
+
+PKG_CRASH="crash"
+PKG_KDUMP="kdump"
+PKG_KEXEC="kexec-tools"
+
+
+function os_pkginstall   { zypper -n in "$@" ; }
+function os_pkginstalled { rpm -q "$@" >/dev/null 2>&1; }
+function os_pkgremove    { zypper -n rm "$@" ; }
+function os_pkgprovides  {
+	declare t=""
+	for file in "$@"; do
+		t="$(zypper se --provides --match-exact "$file"|tail -n1)"
+		t="${t#*|}"
+		echo "${t%%|*}"
+	done
+}
+
+function os_pkgextract {
+	declare pkg="${1:-}"
+	declare dst="${2:-/var/cache/zypp/packages/*/suse/$(uname -m)/}"
+
+	# Extraction folder
+	declare xtd="$dst/extract"
+	[[ -e "$xtd" ]] || mkdir -p "$xtd"
+
+	zypper -n in --download-only "$pkg"
+	# Spawn subshell for path changing
+	(
+		cd $xtd
+		for rpm in "$dst/*.rpm"; do
+			rpm2cpio "$rpm" | cpio -idm
+		done
+	)
+	echo "$xtd"
+}
