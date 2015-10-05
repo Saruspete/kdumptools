@@ -163,11 +163,22 @@ declare dbug_ext="/usr/lib/debug/lib/modules/$CORE_VERS.$CORE_ARCH/vmlinux"
 	# Didn't find it. Ask user what to do
 	logwarning "Cannot find debuginfo file: $DBUG_PATH"
 	if ask_yn "Should I launch 'kdump_getdbg.sh' to get debuginfo files"; then
+		declare osid="$(os_getid)"
 
-		$MYPATH/kdump_getdbg.sh -r "$CORE_VERS" -a "$CORE_ARCH" || {
+		loginfo "Trying with current OS Name: $osid"
+		$MYPATH/kdump_getdbg.sh -r "$CORE_VERS" -a "$CORE_ARCH" -o "$osid" || {
 			logerror "Unable to retrieve debuginfos (return code $?)."
-			logerror "You should check kdump_getdbg.sh or specify the path yourself"
-			exit 10
+
+			if ask_yn "Should I try with a different OS Name"; then
+				read -p "OS Name? (see 'kdump_getdbg.sh -h' for list)" osid
+				$MYPATH/kdump_getdbg.sh -r "$CORE_VERS" -a "$CORE_ARCH" -o "$osid" || {
+					logerror "Unable to retrieve debuginfos (return code $?)."
+					exit 11
+				}
+			else
+				logerror "You should check kdump_getdbg.sh or specify the path yourself"
+				exit 11
+			fi
 		}
 	else
 		logerror "Couldn't find the debuginfo file in $DBUG_PATH"
