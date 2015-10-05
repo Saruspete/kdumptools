@@ -303,14 +303,19 @@ if [[ -n "$PKG_KDUMP" ]]; then
 		# Check kexec is started
 		if [[ -e "/sys/kernel/kexec_crash_loaded" ]]; then
 			[[ "$(</sys/kernel/kexec_crash_loaded)" == "0" ]] && {
-				loginfo "Need to start '$svcname' service"
-				if [[ "$OPT_FIX" == "1" ]] && ask_yn "Start '$svcname' service"; then
-					os_svcstart "$svcname" || {
-						logerror "Error during start of the service"
+				if [[ -n "$svcname" ]]; then
+					loginfo "Need to start '$svcname' service"
+					if [[ "$OPT_FIX" == "1" ]] && ask_yn "Start '$svcname' service"; then
+						os_svcstart "$svcname" || {
+							logerror "Error during start of the service"
+							RET_CODE=RET_CODE+1
+						}
+					else
+						logerror "The service '$svcname' must be started"
 						RET_CODE=RET_CODE+1
-					}
+					fi
 				else
-					logerror "The service '$svcname' must be started"
+					logerror "I dont know the kdump service name to register kexec"
 					RET_CODE=RET_CODE+1
 				fi
 			}
