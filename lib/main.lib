@@ -123,8 +123,7 @@ function file_fetch {
 	declare src="${1:-}"
 	declare dst="${2:-$(file_gettemp)}"
 	
-	# If the requested url is a folder, remove trailing /
-	src="${src%/}"
+	# If the requested dst is a folder, add file name
 	[[ -d "$dst" ]] && dst="$dst/${src##*/}"
 
 	declare ret=1
