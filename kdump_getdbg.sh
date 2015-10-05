@@ -72,11 +72,11 @@ function download_redhat {
 	declare urlbase="$1"
 
 	declare -i ret=0
-	declare ext="$DBUG_VERS.rpm"
 	declare arch="$DBUG_ARCH"
 	[[ "$arch" == "i386" ]] && arch="i686"
 	
 	# Download rpm for kernel and kernel-common-$arch
+	declare ext="$DBUG_VERS.$arch.rpm"
 	for url in $urlbase/kernel-debuginfo{,-common-$arch}-$ext; do
 		loginfo "Downloading '$url' (this may not be the good one)"
 		declare fetch="$(file_fetch "$url" "$DBUG_TEMP")"
