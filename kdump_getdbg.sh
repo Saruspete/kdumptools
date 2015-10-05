@@ -31,7 +31,7 @@ function show_help {
 }
 
 
-eval set -- "$(getopt -o vqha:r:f:F: -l verbose,quiet,help,arch:,release:,family:,flavor: -- "$@")"
+eval set -- "$(getopt -o vqha:r:o:l: -l verbose,quiet,help,arch:,release:,osname:,localrepo: -- "$@")"
 
 while [[ -n "${1:-}" ]]; do
 	case $1 in
@@ -129,7 +129,7 @@ function download_debian {
 
 declare -i retcode=0
 
-case $DIST_OSNAME in
+case $DIST_NAME in
 	#
 	# Test for all RPM based systems
 	#
@@ -202,7 +202,7 @@ case $DIST_OSNAME in
 	# Unknown distribution
 	#
 	*)
-		logerror "Unknown distribution name : '$DIST_OSNAME'"
+		logerror "Unknown distribution name : '$DIST_NAME'"
 		exit 1
 		;;
 
