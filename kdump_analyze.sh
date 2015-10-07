@@ -61,8 +61,9 @@ done
 	exit 0
 }
 
-
-# System version
+#
+# Crash : System version
+#
 [[ -z "$CRSH_BIN" ]] && {
 	logwarning "Cannot find crash utility"
 	
@@ -101,8 +102,9 @@ done
 	}
 }
 
-
-
+#
+# Coredump guess
+#
 CORE_PATH="${1:-$CORE_LIVE}"
 [[ -z "$CORE_PATH" ]] && {
 	show_help
@@ -151,14 +153,29 @@ CORE_VERS="${CORE_VERS%%.$CORE_ARCH}"
 
 loginfo "Guessed kernel $CORE_VERS arch $CORE_ARCH"
 
-declare dbug_ext="/usr/lib/debug/lib/modules/$CORE_VERS.$CORE_ARCH/vmlinux"
+
+#
+# Debuginfo path
+#
+declare dbug_ext="/usr/lib/debug/lib/modules/$CORE_VERS"
+
+# Debian style
+if [[ "${CORE_VERS##*-}" =~ (amd64|i686) ]]; then
+	:
+# Redhat style
+else
+	dbug_ext="$dbug_ext.$CORE_ARCH"
+fi
+
+dbug_ext="$dbug_ext/vmlinux"
+
 # Check system path by default
 [[ -z "$DBUG_PATH" ]] && [[ -e "$dbug_ext" ]] && DBUG_PATH="$dbug_ext"
 
 # Check on our custom path
 [[ -z "$DBUG_PATH" ]] && DBUG_PATH="$DBUG_BASE/$dbug_ext"
 
-# Check for debuginfo
+# try to fetch under custom path
 [[ ! -e "$DBUG_PATH" ]] && {
 	# Didn't find it. Ask user what to do
 	logwarning "Cannot find debuginfo file: $DBUG_PATH"
