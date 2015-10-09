@@ -101,6 +101,7 @@ done
 		exit 1
 	}
 }
+loginfo "Using crash binary $CRSH_BIN"
 
 #
 # Coredump guess
