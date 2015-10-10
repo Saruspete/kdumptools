@@ -12,6 +12,7 @@ declare MYPATH="${MYSELF%/*}"
 
 source "$MYPATH/lib/main.lib"
 source "$MYPATH/lib/os.lib"
+source "$MYPATH/lib/kdump.lib"
 
 declare -i RET_CODE=0
 

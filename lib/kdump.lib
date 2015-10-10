@@ -1,0 +1,109 @@
+# vim: ts=4 ft=sh
+
+# Reset lang
+export LC_ALL=C
+
+
+#####################################################################
+# Boot options
+
+function boot_getopt {
+	declare opt="$1"
+	grep -Po '(^|\s)'$opt'(=[^\s]*)?' /proc/cmdline
+}
+
+function boot_setopt {
+	declare opt="$1"
+	declare val="${2:-}"
+	declare -i r=1
+
+	# Grub
+	for f in /boot/grub{,2}/grub{,2}.{conf,cfg}; do
+		[[ -e "$f" ]] || continue
+		
+		declare o="$opt"
+		[[ -n "$val" ]] && o="$o=$val"
+
+		if [[ -n "$(bin_find "sed")" ]]; then
+			# Remove requested elements
+			sed -Ee '/^\s*(linux|kernel)/s/ '$opt'=?[^ ]+//g' -i "$f"
+			# And add the new
+			sed -Ee '/^\s*(linux|kernel)/s/$/ '$o'/' -i "$f"
+
+			r=$?
+		else
+			r=1
+		fi
+
+	done
+	
+	# TODO: OS Specific
+	[[ -e /etc/sysconfig/grub ]] && {
+		# GRUB_CMDLINE_LINUX=crashkernel
+		:
+	}
+
+	# TODO: mkconfig
+	[[ -n "$(bin_find grub-mkconfig)" ]] && {
+		:
+	}
+
+	return $r
+}
+
+# Implementation according to official doc
+# https://www.kernel.org/doc/Documentation/kdump/kdump.txt
+function boot_getbestmemsize {
+	declare -i mem="$(sys_getmemtotal)"
+
+	declare    size=""
+	declare    arch="$(uname -m)"
+	declare    minram="64M"
+
+	# Increase min ram for debian
+	[[ "$(os_getid)" =~ ^debian- ]] && minram="128M"
+
+	case $arch in
+		i386|x86_64)
+			# These values are from experience. Some editors are more or less generous
+			# on the amount or ram to grant. if auto is not understood by the kernel
+			# 
+			# Redhat tells 128M + 64M/TB or RAM
+			# 2-12  : 128M
+			# 12-48 : 256M
+			# 48-128: 512M
+			if [[ $mem -lt $(normalize_unit "512M") ]]; then
+				logwarning "Your system has less than 512M RAM... crashkernel will also take you 64M"
+				size="128M" # centos: 64M, Debian: 128M
+			elif [[ $mem -lt $(normalize_unit "2G") ]]; then
+				size="128M"
+			else
+				size="auto"
+			fi
+			;;
+
+		ppc64)
+			if [[ "$(getconf PAGESIZE)" == "4096" ]] && [[ $mem -ge $(normalize_unit "2G") ]]; then
+				size="auto"
+			elif [[ $mem -ge $(normalize_unit "8G") ]]; then
+				size="auto"
+			elif [[ $mem -ge $(normalize_unit "2G") ]]; then
+				size="256M@32M"
+			else
+				size="128M@32M"
+			fi
+			;;
+
+		# Not tested...
+		ia64)
+			size="256M@256M"
+			;;
+
+		*)
+			logerror "Unhandled arch: $arch"
+			;;
+	esac
+
+	echo $size
+}
+
