@@ -22,6 +22,7 @@ declare SHOW_HELP=""
 # Prefer locally compiled version
 [[ -s "$MYPATH/src/crash/bin/crash" ]] && {
 	CRSH_BIN="$MYPATH/src/crash/bin/crash"
+	export CRASH_EXTENSIONS="$MYPATH/src/crash/lib"
 }
 
 
@@ -49,7 +50,7 @@ while [[ -n "${1:-}" ]]; do
 		-c|--crash)		CRSH_BIN="$2";  shift 2 ;;
 		-l|--live)		CORE_LIVE="/dev/mem" ; shift ;;
 		-h|--help)		SHOW_HELP=1; shift ;;
-		-q|--quiet)		CRSH_OPTS="-q"; shift ;;
+		-q|--quiet)		CRSH_OPTS="-s"; shift ;;
 		--)				shift; break ;;
 		-?*)			logerror "Unknown option: '$1'"; shift ;;
 		*)				break ;;
@@ -188,7 +189,7 @@ dbug_ext="$dbug_ext/vmlinux"
 			logerror "Unable to retrieve debuginfos (return code $?)."
 
 			if ask_yn "Should I try with a different OS Name"; then
-				read -p "OS Name? (see 'kdump_getdbg.sh -h' for list)" osid
+				read -p "OS Name? (see 'kdump_getdbg.sh -h' for list) " osid
 				$MYPATH/kdump_getdbg.sh -r "$CORE_VERS" -a "$CORE_ARCH" -o "$osid" || {
 					logerror "Unable to retrieve debuginfos (return code $?)."
 					exit 11
