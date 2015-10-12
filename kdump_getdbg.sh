@@ -127,13 +127,23 @@ function download_debian {
 	fi
 }
 
+function download_suse {
+	declare urlbase="$1"
+
+	#kernel-default-debuginfo-3.16.6-2.1.x86_64.rpm
+	#kernel-default-base-debuginfo-3.16.6-2.1.x86_64.rpm
+	
+
+}
+
+
 declare -i retcode=0
 
 case $DIST_NAME in
 	#
 	# Test for all RPM based systems
 	#
-	redhat-*)
+	redhat-*|opensuse-*)
 		[[ -z "$(bin_find "rpm2cpio")" ]] && {
 			logerror "Missing rpm2cpio tool. If you're not on a rpm-based system, you need this tool"
 			exit 1
@@ -195,9 +205,22 @@ case $DIST_NAME in
 		;;
 
 	#
-	# SuSE TODO
+	# SuSE
 	#
-
+	opensuse-opensuse)
+		# http://download.opensuse.org/debug/distribution/13.2/repo/oss/suse/x86_64/kernel-default-debuginfo-3.16.6-2.1.x86_64.rpm
+		# http://download.opensuse.org/debug/distribution/13.2/repo/oss/suse/x86_64/kernel-default-base-debuginfo-3.16.6-2.1.x86_64.rpm
+		declare rel="13.1"
+		case $CORE_VERS in
+			4.1.8-*)  rel="leap/42.1-Current" ;;
+			4.1.6-*)  rel="leap/42.1-Beta1" ;;
+			3.16.*)	rel="13.2" ;;
+			3.11.*) rel="13.1" ;;
+			3.7.*)  rel="12.3" ;;
+		esac
+		download_suse "http://download.opensuse.org/debug/distribution/$rel/repo/oss/suse/$CORE_ARCH"
+		retcode=$?
+		;;
 	#
 	# Unknown distribution
 	#
