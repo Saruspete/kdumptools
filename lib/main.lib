@@ -130,7 +130,7 @@ function file_fetch {
 
 	# Curl
 	if [[ -n "$(bin_find curl)" ]]; then
-		curl -fs --create-dirs -o "$dst" "$src" 2>/dev/null
+		curl -fs -L --create-dirs -o "$dst" "$src" 2>/dev/null
 		ret=$?
 	elif [[ -n "$(bin_find wget)" ]]; then
 		wget -O "$dst" "$src" 2>/dev/null
