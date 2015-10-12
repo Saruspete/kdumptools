@@ -68,29 +68,88 @@ declare misarg=""
 [[ -d "$DBUG_TEMP" ]] || mkdir -p "$DBUG_TEMP" || exit 2
 
 
+#
+# Extraction of packages
+#
+function extract_rpm {
+	declare src="$1"
+	declare dst="$2"
+
+	loginfo "Extracting package '$src' to '$dst'"
+	(
+		cd "$dst"
+		rpm2cpio "$src"|cpio -idm || return 1
+	)
+	return $?
+}
+
+function extract_deb {
+	declare src="$1"
+	declare dst="$2"
+	declare _r=0
+
+	loginfo "Extracting package '$src' to '$dst'"
+
+	# dpkg if available
+	if [[ -n "$(bin_find dpkg-deb)" ]]; then
+		dpkg-deb -x "$file" "$DBUG_BASE"
+		_r=$?
+
+	# ar + tar else
+	elif [[ -n "$(bin_find ar)" ]]; then
+		ar p "$file" "data.tar.gz" | tar -C "$DBUG_BASE" -zx
+		_r=$?
+
+	# Well, now I can't do anything for you
+	else
+		logerror "You need 'dpkg' or 'ar' + 'tar' to extract debian packages"
+		_r=1
+	fi
+
+	return $_r
+}
+
 function download_redhat {
 	declare urlbase="$1"
 
 	declare -i ret=0
 	declare arch="$DBUG_ARCH"
 	[[ "$arch" == "i386" ]] && arch="i686"
-	
+
 	# Download rpm for kernel and kernel-common-$arch
 	declare ext="$DBUG_VERS.$arch.rpm"
 	for url in $urlbase/kernel-debuginfo{,-common-$arch}-$ext; do
 		loginfo "Downloading '$url' (this may not be the good one)"
 		declare fetch="$(file_fetch "$url" "$DBUG_TEMP")"
 		[[ -s "$fetch" ]] || { logerror "Unable to download '$url'"; return 1; }
-		(
-			cd "$DBUG_BASE"
-			rpm2cpio "$fetch"|cpio -idm || return 1
-		)
+		# Extract it
+		extract_rpm "$fetch" "$DBUG_BASE"
 		ret=ret+$?
 	done
 
 	return $ret
 }
 
+function download_suse {
+	declare urlbase="$1"
+
+	declare -i ret=0
+	declare arch="$DBUG_ARCH"
+	[[ "$arch" == "i386" ]] && arch="i686"
+
+	declare flv="${DBUG_VERS##*-}"
+	declare ver="${DBUG_VERS%-$flv}"
+
+	# Download packages debuginfo and base-debuginfo
+	for url in $urlbase/kernel-$flv-{,base-}debuginfo-$ver.$arch.rpm; do
+		loginfo "Downloading '$url'"
+		declare fetch="$(file_fetch "$url" "$DBUG_TEMP")"
+		[[ -s "$fetch" ]] || { logerror "Unable to download '$url'"; return 1; }
+		# Extract it
+		extract_rpm "$fetch" "$DBUG_BASE"
+		ret=ret+$?
+	done
+}
 
 function download_debian {
 	declare urlbase="$1"
@@ -111,29 +170,7 @@ function download_debian {
 	declare file="$(file_fetch "$url" "$dst")"
 	[[ -s "$file" ]] || { logerror "Unable to download '$url'"; return 1; }
 
-	loginfo "Extracting package to '$DBUG_BASE'"
-	# dpkg if available
-	if [[ -n "$(bin_find dpkg-deb)" ]]; then
-		dpkg-deb -x "$file" "$DBUG_BASE"
-
-	# ar + tar else
-	elif [[ -n "$(bin_find ar)" ]]; then
-		ar p "$file" "data.tar.gz" | tar -C "$DBUG_BASE" -zx
-
-	# Well, now I can't do anything for you
-	else
-		logerror "You need 'dpkg' or 'ar' + 'tar' to extract debian packages"
-		return 1
-	fi
-}
-
-function download_suse {
-	declare urlbase="$1"
-
-	#kernel-default-debuginfo-3.16.6-2.1.x86_64.rpm
-	#kernel-default-base-debuginfo-3.16.6-2.1.x86_64.rpm
-	
-
+	extract_deb "$file" "$DBUG_BASE"
 }
 
 
@@ -211,14 +248,14 @@ case $DIST_NAME in
 		# http://download.opensuse.org/debug/distribution/13.2/repo/oss/suse/x86_64/kernel-default-debuginfo-3.16.6-2.1.x86_64.rpm
 		# http://download.opensuse.org/debug/distribution/13.2/repo/oss/suse/x86_64/kernel-default-base-debuginfo-3.16.6-2.1.x86_64.rpm
 		declare rel="13.1"
-		case $CORE_VERS in
+		case $DBUG_VERS in
 			4.1.8-*)  rel="leap/42.1-Current" ;;
 			4.1.6-*)  rel="leap/42.1-Beta1" ;;
 			3.16.*)	rel="13.2" ;;
 			3.11.*) rel="13.1" ;;
 			3.7.*)  rel="12.3" ;;
 		esac
-		download_suse "http://download.opensuse.org/debug/distribution/$rel/repo/oss/suse/$CORE_ARCH"
+		download_suse "http://download.opensuse.org/debug/distribution/$rel/repo/oss/suse/$DBUG_ARCH"
 		retcode=$?
 		;;
 	#
