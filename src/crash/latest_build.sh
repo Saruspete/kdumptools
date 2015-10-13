@@ -14,7 +14,7 @@ make -C "$MYSRCS" -j "$(grep -c processor /proc/cpuinfo)" extensions
 make -C "$MYSRCS" -j "$(grep -c processor /proc/cpuinfo)" memory_driver
 
 # Copy the version
-mkdir -p $MYPATH/{bin,lib,kmod}
-cp $MYSRCS/crash $MYPATH/bin
-cp $MYSRCS/memory_driver/crash.ko $MYPATH/kmod
-cp $MYSRCS/extensions/*.so $MYPATH/lib
+mkdir -p $MYPATH/build/{bin,lib,kmod}
+cp $MYSRCS/crash $MYPATH/build/bin
+cp $MYSRCS/memory_driver/crash.ko $MYPATH/build/kmod
+cp $MYSRCS/extensions/*.so $MYPATH/build/lib

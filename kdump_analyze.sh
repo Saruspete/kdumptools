@@ -20,9 +20,9 @@ declare SHOW_HELP=""
 
 
 # Prefer locally compiled version
-[[ -s "$MYPATH/src/crash/bin/crash" ]] && {
-	CRSH_BIN="$MYPATH/src/crash/bin/crash"
-	export CRASH_EXTENSIONS="$MYPATH/src/crash/lib"
+[[ -s "$MYPATH/src/crash/build/bin/crash" ]] && {
+	CRSH_BIN="$MYPATH/src/crash/build/bin/crash"
+	export CRASH_EXTENSIONS="$MYPATH/src/crash/build/lib"
 }
 
 
